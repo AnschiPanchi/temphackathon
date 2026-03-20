@@ -9,40 +9,65 @@ const AiMentorPro = () => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
     useEffect(() => {
+        let isMounted = true;
         const fetchInsights = async () => {
-            if (!user) return;
-            setLoading(true);
+            if (!user?._id) return;
+            if (isMounted) {
+                setLoading(true);
+                setError(null);
+            }
             try {
                 const token = localStorage.getItem('token');
-                const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/ai/mentor-pro/${user._id}`, {
-                    headers: { Authorization: `Bearer ${token}` }
+                const res = await axios.get(`${API_BASE_URL}/api/ai/mentor-pro/${user._id}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    timeout: 30000
                 });
-                setData(res.data);
+                if (isMounted) {
+                    setData(res.data);
+                }
             } catch (err) {
-                setError("Failed to load AI Mentor PRO insights.");
+                if (!isMounted) return;
+                const timeoutError = err?.code === 'ECONNABORTED';
+                setError(timeoutError ? "AI Mentor PRO took too long to respond. Please try again." : "Failed to load AI Mentor PRO insights.");
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
         fetchInsights();
-    }, [user]);
+        return () => {
+            isMounted = false;
+        };
+    }, [user, API_BASE_URL]);
 
-    if (!data && loading) {
-        return (
-            <div className="flex-center" style={{ height: '70vh', flexDirection: 'column', gap: '1rem' }}>
-                <Sparkles className="animate-spin" size={48} color="#ec4899" />
-                <p className="text-muted">Analyzing your career trajectory and generating PRO insights...</p>
-            </div>
-        );
-    }
+    if (loading) {
+  return (
+    <div className="flex-center" style={{ height: '70vh', flexDirection: 'column', gap: '1rem' }}>
+      <Sparkles className="animate-spin" size={48} color="#ec4899" />
+      <p className="text-muted">Analyzing your career trajectory and generating PRO insights...</p>
+    </div>
+  );
+}
 
-    if (error) {
-        return <div className="container" style={{ paddingTop: '2rem' }}><p style={{ color: 'var(--danger)' }}>{error}</p></div>;
-    }
+if (error) {
+  return (
+    <div className="container" style={{ paddingTop: '2rem' }}>
+      <p style={{ color: 'var(--danger)' }}>{error}</p>
+    </div>
+  );
+}
 
-    if (!data) return null;
+if (!data) {
+  return (
+    <div className="container" style={{ paddingTop: '2rem' }}>
+      <p style={{ color: 'var(--text-muted)' }}>No data available.</p>
+    </div>
+  );
+}
 
     return (
         <>

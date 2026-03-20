@@ -10,18 +10,27 @@ const AiMentor = () => {
     const [error, setError] = useState('');
 
     const generateAdvice = async () => {
+        if (!user?._id || !token) {
+            setError('Please log in again to generate mentor feedback.');
+            return;
+        }
         setLoading(true);
         setError('');
         try {
             const res = await axios.get(
                 `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/ai/mentor/${user._id}`,
-                { headers: { Authorization: `Bearer ${token}` } }
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                    timeout: 30000
+                }
             );
             setAdvice(res.data);
         } catch (err) {
-            setError('Failed to generate mentor feedback. Please try again later.');
+            const timeoutError = err?.code === 'ECONNABORTED';
+            setError(timeoutError ? 'AI Mentor took too long to respond. Please try again.' : 'Failed to generate mentor feedback. Please try again later.');
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     return (

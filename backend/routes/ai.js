@@ -1,5 +1,6 @@
 import express from 'express';
 import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import Attempt from '../models/Attempt.js';
 import User from '../models/User.js';
 import JobMatch from '../models/JobMatch.js';
@@ -10,8 +11,7 @@ import { checkAchievements } from '../utils/achievementEngine.js';
 
 const router = express.Router();
 
-// Helper to get AI instance safely when the route is called
-// It checks for Groq first, then OpenAI fallback.
+// Primary: Groq (using 8b-instant = 500k TPD limit, vs 70b = 100k TPD)
 const getAi = () => {
     if (process.env.GROQ_API_KEY) {
         return new OpenAI({
@@ -26,34 +26,158 @@ const getAi = () => {
     return null;
 };
 
+// Fallback: Gemini (used when Groq hits rate limits)
+const getGemini = () => {
+    if (process.env.GEMINI_API_KEY) {
+        return new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    }
+    return null;
+};
+
+// Call Gemini with a plain text prompt, returns response text
+const callGemini = async (prompt) => {
+    const genAI = getGemini();
+    if (!genAI) throw new Error('Gemini API key not configured');
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+};
+
+// Wrapper: try Groq first, fall back to Gemini on 429/rate-limit errors
+const callAI = async (prompt, useJsonFormat = true) => {
+    const ai = getAi();
+    if (ai) {
+        try {
+            const params = {
+                model: process.env.GROQ_API_KEY ? 'llama-3.1-8b-instant' : 'gpt-4o-mini',
+                messages: [{ role: 'system', content: prompt }],
+            };
+            if (useJsonFormat) params.response_format = { type: 'json_object' };
+            const response = await ai.chat.completions.create(params);
+            return response.choices[0].message.content;
+        } catch (err) {
+            const isRateLimit = err.status === 429 || (err.message && err.message.includes('rate_limit'));
+            if (isRateLimit) {
+                console.warn('[WARN] Groq rate limit hit, falling back to Gemini...');
+            } else {
+                // For non-rate-limit errors, try without json_object format
+                if (useJsonFormat) {
+                    try {
+                        const params2 = {
+                            model: process.env.GROQ_API_KEY ? 'llama-3.1-8b-instant' : 'gpt-4o-mini',
+                            messages: [{ role: 'system', content: prompt }],
+                        };
+                        const response2 = await ai.chat.completions.create(params2);
+                        return response2.choices[0].message.content;
+                    } catch (err2) {
+                        const isRateLimit2 = err2.status === 429 || (err2.message && err2.message.includes('rate_limit'));
+                        if (!isRateLimit2) throw err2;
+                        console.warn('[WARN] Groq rate limit hit on retry, falling back to Gemini...');
+                    }
+                } else {
+                    throw err;
+                }
+            }
+        }
+    }
+    // Gemini fallback
+    return callGemini(prompt);
+};
+
 const getModel = () => {
-    // We default to llama 3.3 for Groq and gpt-4o-mini for OpenAI to ensure speed and low cost
-    return process.env.GROQ_API_KEY ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
+    return process.env.GROQ_API_KEY ? 'llama-3.1-8b-instant' : 'gpt-4o-mini';
 };
 
 // Helper to safely parse JSON from AI response, stripping markdown formatting if present
 const parseJSONResponse = (text) => {
     try {
         const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(cleaned);
+        try {
+            return JSON.parse(cleaned);
+        } catch {
+            const firstBrace = cleaned.indexOf('{');
+            const lastBrace = cleaned.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                const jsonSlice = cleaned.slice(firstBrace, lastBrace + 1);
+                return JSON.parse(jsonSlice);
+            }
+            throw new Error('No valid JSON object found in model response.');
+        }
     } catch (e) {
         throw new Error(`Failed to parse AI response as JSON: ${e.message}`);
     }
 };
 
+const buildMentorFallback = (user, missingSkills = [], recommendedJobsContext = '') => {
+    const nextSkills = missingSkills.length > 0
+        ? missingSkills.slice(0, 4).map(skill => `${skill}: Focus on this to align with current job requirements.`)
+        : [
+            'Data Structures & Algorithms: Strengthen interview fundamentals and speed.',
+            'System Design Basics: Improve architecture discussions in interviews.',
+            'Project Communication: Explain trade-offs and impact clearly.'
+        ];
+
+    return {
+        nextSkills,
+        projectIdeas: [
+            `Build an end-to-end portfolio project for ${user?.targetJob || 'Software Engineer'} with authentication, dashboards, and deployment.`,
+            'Create a measurable case study: define a problem, build a solution, and share before/after impact metrics.'
+        ],
+        portfolioTips: [
+            'Rewrite top 3 resume bullets using impact metrics (latency, users, conversions, or uptime).',
+            'Pin 2 polished repositories with clear README, architecture diagram, and demo screenshots.'
+        ],
+        linkedinPostIdeas: [
+            'Post a weekly build log with one technical challenge, one lesson, and one metric.',
+            `Share insights from job trends you observed${recommendedJobsContext ? `: ${recommendedJobsContext}` : ''}.`
+        ],
+        careerAdvice: `You are making solid progress toward ${user?.targetJob || 'your target role'}. Keep your focus on consistent project execution, improving interview storytelling, and closing the highest-impact skill gaps one by one.`
+    };
+};
+
+const buildMentorProFallback = (user, missingSkills = []) => ({
+    careerAdvice: `Your profile has strong momentum for ${user?.targetJob || 'your target role'}. Prioritize shipping visible projects and strengthening missing skills through deliberate weekly practice.`,
+    roadmap: [
+        'Step 1: Pick one core missing skill and complete a focused 7-day learning sprint.',
+        'Step 2: Build and deploy one portfolio project that proves this skill in production.',
+        'Step 3: Practice interview explanations: architecture, trade-offs, and measurable impact.',
+        'Step 4: Apply to matching roles and iterate based on interview feedback weekly.'
+    ],
+    projectRecommendations: [
+        `Build a job-ready capstone for ${user?.targetJob || 'Software Engineer'} using ${missingSkills.slice(0, 2).join(' + ') || 'modern backend + frontend tooling'}.`
+    ],
+    linkedinSuggestions: [
+        'Publish a post: what you built this week, one technical obstacle, and how you solved it.',
+        'Share a concise architecture breakdown of your project with lessons learned.'
+    ],
+    nextSkills: missingSkills.length > 0 ? missingSkills.slice(0, 5) : ['System Design', 'APIs', 'Testing']
+});
+
 router.post('/generate-question', verifyToken, async (req, res) => {
     try {
+        console.log('[DEBUG] /generate-question called with mode:', req.body.mode);
+        
         const ai = getAi();
-        if (!ai) return res.status(503).json({ error: "AI API key not configured on server." });
+        if (!ai) {
+            console.error('[ERROR] AI client not initialized. Check GROQ_API_KEY or OPENAI_API_KEY');
+            return res.status(503).json({ error: "AI API key not configured on server." });
+        }
+        
         const { mode, topics = [], difficulty, solvedQuestions = [] } = req.body;
+        console.log('[DEBUG] Parameters:', { mode, topics, difficulty, solvedQuestionsCount: solvedQuestions.length });
 
         const user = await User.findById(req.userId);
+        if (!user) {
+            console.error('[ERROR] User not found:', req.userId);
+            return res.status(404).json({ error: "User not found" });
+        }
         
         let targetTopics = topics;
         if (mode === 'ai-recommended') {
             const jobMatches = await JobMatch.find({ userId: req.userId }).select('missingSkills');
             const missingSkills = [...new Set(jobMatches.flatMap(m => m.missingSkills || []))];
             targetTopics = missingSkills.length > 0 ? missingSkills : ['General Problem Solving'];
+            console.log('[DEBUG] AI-recommended topics:', targetTopics);
         }
 
         const avoidanceRule = solvedQuestions.length > 0
@@ -101,17 +225,23 @@ Provide the response in the following JSON format ONLY:
   }
 }`;
 
-        const response = await ai.chat.completions.create({
-            model: getModel(),
-            messages: [{ role: "system", content: prompt }],
-            response_format: { type: "json_object" }
-        });
+        const model = getModel();
+        console.log('[DEBUG] Using AI model:', model);
+        
+        const rawContent = await callAI(prompt, true);
 
-        let questionData = parseJSONResponse(response.choices[0].message.content);
+        console.log('[DEBUG] API response received, parsing...');
+        let questionData = parseJSONResponse(rawContent);
+        console.log('[DEBUG] Question generated successfully:', questionData.title);
         res.json(questionData);
     } catch (error) {
-        console.error("Error generating question:", error);
-        res.status(500).json({ error: "Failed to generate question: " + error.message, stack: error.stack });
+        console.error('[ERROR] Exception in /generate-question:', error.message);
+        console.error('[ERROR] Full error details:', error);
+        res.status(500).json({ 
+            error: "Failed to generate question: " + error.message,
+            details: error.response?.data || error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 
@@ -148,13 +278,7 @@ Provide your feedback in the following JSON format ONLY:
   "spaceComplexity": "O(1) - explain why"
 }`;
 
-        const response = await ai.chat.completions.create({
-            model: getModel(),
-            messages: [{ role: "system", content: prompt }],
-            response_format: { type: "json_object" }
-        });
-
-        let reviewData = parseJSONResponse(response.choices[0].message.content);
+        let reviewData = parseJSONResponse(await callAI(prompt, true));
 
         // Persistent persistence: Save the interview attempt
         const attempt = new Attempt({
@@ -176,8 +300,12 @@ Provide your feedback in the following JSON format ONLY:
 
         res.json({ ...reviewData, earnedAchievements: earned });
     } catch (error) {
-        console.error("Error reviewing submission:", error);
-        res.status(500).json({ error: "Failed to review submission: " + error.message, stack: error.stack });
+        console.error("[ERROR] Error reviewing submission:", error.message);
+        console.error("[ERROR] Full error details:", error);
+        res.status(500).json({ 
+            error: "Failed to review submission: " + error.message,
+            details: error.response?.data || error.message
+        });
     }
 });
 
@@ -207,17 +335,11 @@ Give ONE short but useful hint (2-3 sentences max).
 
 Respond in JSON: { "hint": "your hint here" }`;
 
-        const response = await ai.chat.completions.create({
-            model: getModel(),
-            messages: [{ role: "system", content: prompt }],
-            response_format: { type: "json_object" }
-        });
-
-        let hintData = parseJSONResponse(response.choices[0].message.content);
+        let hintData = parseJSONResponse(await callAI(prompt, true));
         res.json({ hint: hintData.hint });
     } catch (error) {
-        console.error('Error generating hint:', error);
-        res.status(500).json({ error: 'Failed to generate hint: ' + error.message, stack: error.stack });
+        console.error('[ERROR] Error generating hint:', error.message);
+        res.status(500).json({ error: 'Failed to generate hint: ' + error.message });
     }
 });
 
@@ -248,12 +370,10 @@ Rules:
             { role: "user", content: message }
         ];
 
-        const response = await ai.chat.completions.create({
-            model: getModel(),
-            messages,
-        });
-
-        res.json({ reply: response.choices[0].message.content.trim() });
+        // For chat we pass the full messages array; use callAI with a combined prompt
+        const combinedPrompt = messages.map(m => `[${m.role}]: ${m.content}`).join('\n');
+        const reply = await callAI(combinedPrompt, false);
+        res.json({ reply: reply.trim() });
     } catch (error) {
         console.error('Chat error:', error);
         res.status(500).json({ error: 'Failed to get AI response' });
@@ -314,13 +434,7 @@ Provide the response in the following JSON format ONLY, without any markdown for
   "reason": "A motivational, personalized 1-2 sentence explanation of why this topic is perfect for them based on their specific weak areas, target job, or skillset."
 }`;
 
-        const response = await ai.chat.completions.create({
-            model: getModel(),
-            messages: [{ role: "system", content: prompt }],
-            response_format: { type: "json_object" }
-        });
-
-        let data = parseJSONResponse(response.choices[0].message.content);
+        let data = parseJSONResponse(await callAI(prompt, true));
         res.json(data);
     } catch (error) {
         console.error("Error generating topic recommendation:", error);
@@ -358,13 +472,7 @@ Provide the response in the following JSON format ONLY, without any markdown for
   ]
 }`;
 
-        const response = await ai.chat.completions.create({
-            model: getModel(),
-            messages: [{ role: "system", content: prompt }],
-            response_format: { type: "json_object" }
-        });
-
-        let data = parseJSONResponse(response.choices[0].message.content);
+        let data = parseJSONResponse(await callAI(prompt, true));
         res.json(data);
     } catch (error) {
         console.error("Error generating skill gap:", error);
@@ -374,8 +482,6 @@ Provide the response in the following JSON format ONLY, without any markdown for
 
 router.post('/study-guide', async (req, res) => {
     try {
-        const ai = getAi();
-        if (!ai) return res.status(503).json({ error: "AI API key not configured on server" });
         const { topic } = req.body;
 
         const prompt = `You are an expert technical coach. Create a comprehensive, concise study guide for the topic: "${topic}".
@@ -400,13 +506,7 @@ router.post('/study-guide', async (req, res) => {
           }
         }`;
 
-        const response = await ai.chat.completions.create({
-            model: getModel(),
-            messages: [{ role: "system", content: prompt }],
-            response_format: { type: "json_object" }
-        });
-
-        let data = parseJSONResponse(response.choices[0].message.content);
+        let data = parseJSONResponse(await callAI(prompt, true));
         res.json(data);
     } catch (error) {
         console.error("Error generating study guide:", error);
@@ -417,7 +517,6 @@ router.post('/study-guide', async (req, res) => {
 router.get('/mentor/:userId', verifyToken, async (req, res) => {
     try {
         const ai = getAi();
-        if (!ai) return res.status(503).json({ error: "AI API key not configured on server." });
         
         // 1. Fetch User Data
         const user = await User.findById(req.params.userId);
@@ -474,16 +573,14 @@ Provide the response in the following JSON format ONLY, without any markdown for
   "careerAdvice": "A highly motivational, specific paragraph summarizing their readiness and immediate next steps."
 }`;
 
-        // 5. Generate Response
-        const response = await ai.chat.completions.create({
-            model: getModel(),
-            messages: [{ role: "system", content: prompt }],
-            response_format: { type: "json_object" }
-        });
-
-        // 6. Return Structured JSON
-        let mentorAdvice = parseJSONResponse(response.choices[0].message.content);
-        res.json(mentorAdvice);
+        try {
+            const content = await callAI(prompt, true);
+            let mentorAdvice = parseJSONResponse(content);
+            return res.json(mentorAdvice);
+        } catch (aiError) {
+            console.error("AI provider error in /mentor, using fallback:", aiError.message);
+            return res.json(buildMentorFallback(user, uniqueMissingSkills, recommendedJobsContext));
+        }
 
     } catch (error) {
         console.error("Error generating AI Mentor advice:", error);
@@ -494,7 +591,6 @@ Provide the response in the following JSON format ONLY, without any markdown for
 router.get('/mentor-pro/:userId', verifyToken, async (req, res) => {
     try {
         const ai = getAi();
-        if (!ai) return res.status(503).json({ error: "AI API key not configured on server." });
         
         const user = await User.findById(req.params.userId);
         if (!user) return res.status(404).json({ error: "User not found" });
@@ -529,13 +625,14 @@ CRITICAL: Return ONLY this fully structured JSON format. NEVER wrap in markdown 
   ]
 }`;
 
-        const response = await ai.chat.completions.create({
-            model: getModel(),
-            messages: [{ role: "system", content: prompt }]
-        });
-
-        let data = parseJSONResponse(response.choices[0].message.content);
-        res.json(data);
+        try {
+            const content = await callAI(prompt, true);
+            let data = parseJSONResponse(content);
+            return res.json(data);
+        } catch (aiError) {
+            console.error("AI provider error in /mentor-pro, using fallback:", aiError.message);
+            return res.json(buildMentorProFallback(user, missingSkills));
+        }
 
     } catch (error) {
         console.error("Error generating AI Mentor Pro advice:", error);
@@ -545,8 +642,6 @@ CRITICAL: Return ONLY this fully structured JSON format. NEVER wrap in markdown 
 
 router.get('/projects/recommend/:userId', verifyToken, async (req, res) => {
     try {
-        const ai = getAi();
-        if (!ai) return res.status(503).json({ error: "AI API key not configured on server" });
         const user = await User.findById(req.params.userId);
         
         // Fetch JobMatches to find missing skills
@@ -573,13 +668,7 @@ router.get('/projects/recommend/:userId', verifyToken, async (req, res) => {
             ]
         }`;
 
-        const response = await ai.chat.completions.create({
-            model: getModel(),
-            messages: [{ role: "system", content: prompt }],
-            response_format: { type: "json_object" }
-        });
-
-        const data = parseJSONResponse(response.choices[0].message.content);
+        const data = parseJSONResponse(await callAI(prompt, true));
         
         await ProjectRecommendation.deleteMany({ userId: user._id }); // wipe old
         const savedProjects = await Promise.all(
@@ -594,8 +683,6 @@ router.get('/projects/recommend/:userId', verifyToken, async (req, res) => {
 
 router.post('/practice/generate-task', verifyToken, async (req, res) => {
     try {
-        const ai = getAi();
-        if (!ai) return res.status(503).json({ error: "AI API key not configured on server" });
         const { skill, targetJob } = req.body;
 
         const prompt = `You are a Technical Assessment Generator.
@@ -614,13 +701,7 @@ router.post('/practice/generate-task', verifyToken, async (req, res) => {
             "difficulty": "Medium"
         }`;
 
-        const response = await ai.chat.completions.create({
-            model: getModel(),
-            messages: [{ role: "system", content: prompt }],
-            response_format: { type: "json_object" }
-        });
-
-        const data = parseJSONResponse(response.choices[0].message.content);
+        const data = parseJSONResponse(await callAI(prompt, true));
 
         const newTask = await PracticeTask.create({
             userId: req.userId,
