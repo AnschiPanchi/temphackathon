@@ -337,7 +337,7 @@ const JobMatchHub = () => {
                                             <h4 style={{ fontSize: '0.95rem', margin: 0 }}>{job.title}</h4>
                                             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>{job.type}</span>
                                         </div>
-                                        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.65rem', flexWrap: 'wrap' }}>
+                                        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--text-sub)', marginBottom: '0.65rem', flexWrap: 'wrap' }}>
                                             <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Building2 size={11} />{job.company}</span>
                                             <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><MapPin size={11} />{job.location}</span>
                                             <span>{job.posted}</span>
@@ -377,7 +377,7 @@ const JobMatchHub = () => {
                                 <div style={{ marginBottom: '1.25rem' }}>
                                     <h3 style={{ marginBottom: '0.3rem', fontSize: '1.05rem' }}>{selectedJob.title}</h3>
                                     <p style={{ color: 'var(--violet-light)', fontWeight: 700, marginBottom: '0.6rem', fontSize: '0.9rem' }}>{selectedJob.company}</p>
-                                    <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                                    <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.8rem', color: 'var(--text-sub)', flexWrap: 'wrap' }}>
                                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><MapPin size={11} />{selectedJob.location}</span>
                                         <span>{selectedJob.type}</span>
                                         <span>{selectedJob.posted}</span>

@@ -88,9 +88,6 @@ const Landing = () => {
                 }} />
 
                 <div className="slide-up" style={{ position: 'relative', zIndex: 1, maxWidth: '850px', margin: '0 auto' }}>
-                    <div className="feature-chip" style={{ marginBottom: '2rem' }}>
-                        <Sparkles size={13} /> Powered by Google Gemini AI
-                    </div>
 
                     <h1 style={{ fontWeight: 900, letterSpacing: '-0.04em', marginBottom: '1.5rem', lineHeight: 1.05 }}>
                         Stop Practicing.
