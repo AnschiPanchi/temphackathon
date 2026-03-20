@@ -44,49 +44,42 @@ const callGemini = async (prompt) => {
     return result.response.text();
 };
 
+const GROQ_PRIMARY = 'llama-3.3-70b-versatile';
+const GROQ_FALLBACK = 'llama-3.1-8b-instant'; // reliable free-tier fallback
+
 const callAI = async (prompt, useJsonFormat = true) => {
     const ai = getAi();
     if (ai) {
-        try {
+        const tryGroq = async (modelName) => {
             const params = {
-                model: process.env.GROQ_API_KEY ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini',
+                model: modelName,
                 messages: [{ role: 'system', content: prompt }],
             };
             if (useJsonFormat) params.response_format = { type: 'json_object' };
             const response = await ai.chat.completions.create(params);
             return response.choices[0].message.content;
+        };
+
+        try {
+            console.log(`[AI] Attempting primary model: ${GROQ_PRIMARY}`);
+            return await tryGroq(GROQ_PRIMARY);
         } catch (err) {
-            const isRateLimit = err.status === 429 || (err.message && err.message.includes('rate_limit'));
-            if (isRateLimit) {
-                console.warn('[WARN] Groq rate limit hit, falling back to Gemini...');
-            } else {
-                // For non-rate-limit errors, try without json_object format
-                if (useJsonFormat) {
-                    try {
-                        const params2 = {
-                            model: process.env.GROQ_API_KEY ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini',
-                            messages: [{ role: 'system', content: prompt }],
-                        };
-                        const response2 = await ai.chat.completions.create(params2);
-                        return response2.choices[0].message.content;
-                    } catch (err2) {
-                        const isRateLimit2 = err2.status === 429 || (err2.message && err2.message.includes('rate_limit'));
-                        if (!isRateLimit2) throw err2;
-                        console.warn('[WARN] Groq rate limit hit on retry, falling back to Gemini...');
-                    }
-                } else {
-                    throw err;
-                }
+            console.warn(`[AI] Primary model ${GROQ_PRIMARY} failed: ${err.message}. Trying fallback ${GROQ_FALLBACK}...`);
+            try {
+                return await tryGroq(GROQ_FALLBACK);
+            } catch (err2) {
+                console.warn(`[AI] Groq fallback failed: ${err2.message}. Moving to Gemini...`);
+                // Fall through to Gemini below
             }
         }
     }
-    // Gemini fallback
+
+    // Gemini fallback: Always try this if Groq fails or is not configured
+    console.log('[AI] Falling back to Gemini...');
     return callGemini(prompt);
 };
 
-const getModel = () => {
-    return process.env.GROQ_API_KEY ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
-};
+const getModel = () => GROQ_PRIMARY;
 
 // Helper to safely parse JSON from AI response, stripping markdown formatting if present
 const parseJSONResponse = (text) => {
