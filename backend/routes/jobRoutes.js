@@ -45,12 +45,16 @@ router.post('/test-sync', async (req, res) => {
     try {
         const { userId } = req.body;
         await fetchAndMatchJobs(userId);
-        res.json({ success: true, message: "Sync complete." });
+        
+        // Count matches for this user specifically
+        const matchesCount = await JobMatch.countDocuments({ userId });
+        res.json({ success: true, message: `Sync complete. Scanned Remotive and matched ${matchesCount} jobs for your profile!`, count: matchesCount });
     } catch (error) {
          console.error("Job sync route error:", error);
          res.status(500).json({ error: "Sync failed" });
     }
 });
+
 
 
 export default router;

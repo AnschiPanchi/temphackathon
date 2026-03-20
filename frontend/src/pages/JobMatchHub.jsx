@@ -115,19 +115,24 @@ const JobMatchHub = () => {
     const handleSync = async () => {
         setSyncing(true);
         try {
-            await axios.post(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/jobs/test-sync`, {
+            const resSync = await axios.post(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/jobs/test-sync`, {
                 userId: user?._id
             });
-
+            alert(resSync.data.message || 'Job scan successfully completed!');
+            
             if (user?._id) {
                  const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/jobs/recommended/${user._id}`);
                  setFetchedJobs(res.data);
                  const res2 = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/jobs/notifications/${user._id}`);
                  setNotifications(res2.data);
             }
-        } catch(e) { console.error(e) }
+        } catch(e) { 
+            console.error(e);
+            alert('Job sync encountered an error. Please try again.');
+        }
         setSyncing(false);
     };
+
 
     const markNotificationRead = async (id) => {
         try {
@@ -220,41 +225,69 @@ const JobMatchHub = () => {
                         <h2 style={{ marginBottom: '0.4rem' }}>Smart <span className="text-gradient">Job Match</span></h2>
                         <p>Scores calculated using your actual skills and target role.</p>
                         
-                        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            <button className="btn btn-outline" onClick={handleSync} disabled={syncing}>
+                        <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                            <button 
+                                className={`btn ${notifications.some(n => !n.read) ? 'btn-primary' : 'btn-outline'}`} 
+                                onClick={handleSync} 
+                                disabled={syncing}
+                                style={{ boxShadow: syncing ? 'none' : 'var(--shadow-glow-v)' }}
+                            >
                                 <RefreshCw size={16} className={syncing ? 'loading-spin' : ''} />
-                                {syncing ? 'Scanning for Jobs...' : 'Trigger AI Job Sync'}
+                                {syncing ? 'Syncing...' : 'Trigger AI Job Sync'}
                             </button>
-                            
-                            {notifications.filter(n => !n.read).map(notif => (
-                                <div key={notif._id} style={{ display: 'flex', gap: '0.5rem', background: 'rgba(59,130,246,0.1)', padding: '0.5rem 1rem', borderRadius: '8px', alignItems: 'center', fontSize: '0.8rem', color: 'var(--blue-light)' }}>
-                                    <Bell size={14} />
-                                    <span style={{ flex: 1 }}>{notif.message}</span>
-                                    <button onClick={() => markNotificationRead(notif._id)} style={{ background: 'transparent', border: 'none', color: 'var(--blue-light)', fontWeight: 'bold', cursor: 'pointer' }}>Mark Read</button>
+
+                            {/* Simple notification badge if there are new matches */}
+                            {notifications.filter(n => !n.read).length > 0 && (
+                                <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '0.5rem', 
+                                    padding: '0.5rem 0.85rem', 
+                                    background: 'rgba(59,130,246,0.1)', 
+                                    borderRadius: '12px',
+                                    border: '1px solid rgba(59,130,246,0.2)',
+                                    fontSize: '0.8rem'
+                                }}>
+                                    <Bell size={14} color="var(--blue-light)" />
+                                    <span style={{ color: 'var(--blue-light)', fontWeight: 600 }}>
+                                        {notifications.filter(n => !n.read).length} New Matches Found
+                                    </span>
+                                    <button 
+                                        className="btn btn-ghost btn-sm" 
+                                        style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem', marginLeft: '0.5rem' }}
+                                        onClick={() => notifications.forEach(n => markNotificationRead(n._id))}
+                                    >
+                                        Clear
+                                    </button>
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </div>
                     {/* Profile summary */}
-                    <div className="glass-panel" style={{ padding: '0.85rem 1.25rem', fontSize: '0.82rem' }}>
-                        <div style={{ color: 'var(--text-muted)', marginBottom: '0.35rem', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Your Profile</div>
-                        {user?.targetJob && (
+                    <div className="glass-panel" style={{ padding: '0.85rem 1.25rem', fontSize: '0.82rem', maxWidth: '300px' }}>
+                        <div style={{ color: 'var(--text-muted)', marginBottom: '0.35rem', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>YOUR PROFILE</div>
+                        {user?.targetJob ? (
                             <div style={{ marginBottom: '0.35rem' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Target: </span>
                                 <span style={{ fontWeight: 700, color: 'var(--violet-light)' }}>{user.targetJob}</span>
                             </div>
+                        ) : (
+                            <div style={{ color: 'var(--danger)', marginBottom: '0.35rem', fontWeight: 600 }}>No Target Job Set</div>
                         )}
-                        {user?.skills?.length > 0 && (
+                        {user?.skills?.length > 0 ? (
                             <div>
                                 <span style={{ color: 'var(--text-muted)' }}>Skills: </span>
                                 <span style={{ fontWeight: 600 }}>{user.skills.slice(0, 4).join(', ')}{user.skills.length > 4 ? ` +${user.skills.length - 4}` : ''}</span>
                             </div>
+                        ) : (
+                            <div style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No skills detected yet.</div>
                         )}
-                        <button className="btn btn-ghost btn-sm" style={{ marginTop: '0.5rem', padding: '0.2rem 0.6rem', fontSize: '0.72rem' }} onClick={() => navigate('/forge')}>
+                        <button className="btn btn-ghost btn-sm" style={{ marginTop: '0.5rem', padding: '0.2rem 0.6rem', fontSize: '0.72rem', border: '1px solid var(--border)' }} onClick={() => navigate('/forge')}>
                             Update Forge →
                         </button>
                     </div>
                 </div>
+
 
                 {/* Search + filter */}
                 <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
