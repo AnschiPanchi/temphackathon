@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import axios from 'axios';
 import { Code2, Clock, Send, PlayCircle, Loader2, Sparkles, AlertCircle, Lightbulb, CheckCircle2, XCircle } from 'lucide-react';
 import TimesUpOverlay from '../components/TimesUpOverlay';
 import ChatAssistant from '../components/ChatAssistant';
+import { AuthContext } from '../context/AuthContext';
 
 const SESSION_KEY = 'interviewSession';
 
 const InterviewRoom = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { addXP } = useContext(AuthContext);
 
     const savedSession = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
     const { question, setup } = location.state || savedSession || {};
@@ -130,6 +132,11 @@ const InterviewRoom = () => {
             if (hintPenalty > 0) reviewData.feedback += ` (Note: −${hintPenalty} pts deducted for ${hints.length} hint${hints.length > 1 ? 's' : ''} used.)`;
             setFeedback(reviewData);
             sessionStorage.removeItem(SESSION_KEY);
+
+            // Update XP/level in AuthContext immediately so nav bar reflects it
+            if (reviewData.totalXp !== undefined) {
+                addXP(0, reviewData.level); // use absolute values from server
+            }
 
             await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/performance/save`, {
                 topic: setup?.topic || 'General',

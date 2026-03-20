@@ -2,11 +2,19 @@ import React from 'react';
 
 const GridBackground = () => {
     return (
-        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 0,
+            pointerEvents: 'none',
+            overflow: 'hidden'
+        }}>
             {/* Base Grid */}
-            <div 
-                className="absolute inset-0 opacity-[0.15]" 
+            <div
                 style={{
+                    position: 'absolute',
+                    inset: 0,
+                    opacity: 0.15,
                     backgroundImage: `
                         linear-gradient(to right, var(--text-muted) 1px, transparent 1px),
                         linear-gradient(to bottom, var(--text-muted) 1px, transparent 1px)
@@ -18,9 +26,11 @@ const GridBackground = () => {
             />
 
             {/* Glowing Accent Lines */}
-            <div 
-                className="absolute inset-0 opacity-[0.2]"
+            <div
                 style={{
+                    position: 'absolute',
+                    inset: 0,
+                    opacity: 0.2,
                     backgroundImage: `
                         linear-gradient(to right, var(--blue) 1px, transparent 1px),
                         linear-gradient(to bottom, var(--blue) 1px, transparent 1px)
@@ -31,15 +41,40 @@ const GridBackground = () => {
             />
 
             {/* Radial Glows */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue/10 rounded-full blur-[120px] animate-pulse"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-violet/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
-            
+            <div style={{
+                position: 'absolute',
+                top: '-10%',
+                left: '-10%',
+                width: '40%',
+                height: '40%',
+                background: 'rgba(59, 130, 246, 0.1)',
+                borderRadius: '50%',
+                filter: 'blur(120px)',
+                animation: 'pulse 4s ease-in-out infinite'
+            }} />
+            <div style={{
+                position: 'absolute',
+                bottom: '-10%',
+                right: '-10%',
+                width: '40%',
+                height: '40%',
+                background: 'rgba(139, 92, 246, 0.1)',
+                borderRadius: '50%',
+                filter: 'blur(120px)',
+                animation: 'pulse 4s ease-in-out infinite',
+                animationDelay: '2s'
+            }} />
+
             <style dangerouslySetInnerHTML={{ __html: `
                 @keyframes gridPulse {
                     0%, 100% { opacity: 0.1; transform: scale(1); }
                     50% { opacity: 0.3; transform: scale(1.05); }
                 }
-                body.light .fixed.inset-0.z-0 {
+                @keyframes pulse {
+                    0%, 100% { opacity: 0.6; }
+                    50% { opacity: 1; }
+                }
+                body.light .grid-background {
                     opacity: 0.4;
                 }
             `}} />

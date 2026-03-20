@@ -88,7 +88,11 @@ router.post('/register', async (req, res) => {
                 id: user._id, 
                 username: user.username, 
                 email: user.email,
-                currentStreak: user.currentStreak
+                xp: user.xp || 0,
+                level: user.level || 1,
+                currentStreak: user.currentStreak,
+                skills: user.skills || [],
+                targetJob: user.targetJob || ''
             } 
         });
     } catch (err) {
@@ -118,7 +122,19 @@ router.post('/login', async (req, res) => {
         const newStreak = await updateStreak(user);
 
         const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-        res.json({ token, user: { id: user._id, username: user.username, email: user.email, currentStreak: newStreak } });
+        res.json({ 
+            token, 
+            user: { 
+                id: user._id, 
+                username: user.username, 
+                email: user.email, 
+                currentStreak: newStreak,
+                xp: user.xp || 0,
+                level: user.level || 1,
+                skills: user.skills || [],
+                targetJob: user.targetJob || ''
+            } 
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error during login' });

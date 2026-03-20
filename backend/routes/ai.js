@@ -8,6 +8,7 @@ import ProjectRecommendation from '../models/ProjectRecommendation.js';
 import PracticeTask from '../models/PracticeTask.js';
 import verifyToken from '../middleware/auth.js';
 import { checkAchievements } from '../utils/achievementEngine.js';
+import { calculateLevel } from '../utils/leveling.js';
 
 const router = express.Router();
 
@@ -43,13 +44,12 @@ const callGemini = async (prompt) => {
     return result.response.text();
 };
 
-// Wrapper: try Groq first, fall back to Gemini on 429/rate-limit errors
 const callAI = async (prompt, useJsonFormat = true) => {
     const ai = getAi();
     if (ai) {
         try {
             const params = {
-                model: process.env.GROQ_API_KEY ? 'llama-3.1-8b-instant' : 'gpt-4o-mini',
+                model: process.env.GROQ_API_KEY ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini',
                 messages: [{ role: 'system', content: prompt }],
             };
             if (useJsonFormat) params.response_format = { type: 'json_object' };
@@ -64,7 +64,7 @@ const callAI = async (prompt, useJsonFormat = true) => {
                 if (useJsonFormat) {
                     try {
                         const params2 = {
-                            model: process.env.GROQ_API_KEY ? 'llama-3.1-8b-instant' : 'gpt-4o-mini',
+                            model: process.env.GROQ_API_KEY ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini',
                             messages: [{ role: 'system', content: prompt }],
                         };
                         const response2 = await ai.chat.completions.create(params2);
@@ -85,7 +85,7 @@ const callAI = async (prompt, useJsonFormat = true) => {
 };
 
 const getModel = () => {
-    return process.env.GROQ_API_KEY ? 'llama-3.1-8b-instant' : 'gpt-4o-mini';
+    return process.env.GROQ_API_KEY ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
 };
 
 // Helper to safely parse JSON from AI response, stripping markdown formatting if present
@@ -247,38 +247,109 @@ Provide the response in the following JSON format ONLY:
 
 router.post('/review', verifyToken, async (req, res) => {
     try {
-        const ai = getAi();
-        if (!ai) return res.status(503).json({ error: "AI API key not configured on server" });
         const { question, language, code, approach } = req.body;
 
         const user = await User.findById(req.userId);
         if (!user) return res.status(404).json({ error: "User not found" });
 
-        const prompt = `You are a supportive but rigorous technical interviewer. 
-Review the following user submission for a DSA problem.
+        // --- Server-side empty/placeholder code detection ---
+        // Remove ALL whitespace to detect if any real logic exists beyond boilerplate
+        const strippedCode = (code || '').replace(/\s/g, '');
+        const starterPatterns = [
+            /\/\/yourcode(here)?/i,
+            /#yourcode(here)?/i,
+            /\/\/TODO/i,
+            /returnundefined/i,
+            /returnnull/i,
+        ];
+        // Code is effectively empty if: no meaningful content, or only starter template patterns
+        const isEffectivelyEmpty =
+            !code ||
+            !code.trim() ||
+            strippedCode.length < 20 ||
+            starterPatterns.some(p => p.test(strippedCode));
 
-Problem: 
+        // Empty code ALWAYS gets 0 — approach text does NOT save you
+        if (isEffectivelyEmpty) {
+            console.log('[REVIEW] Empty/starter code detected, returning score 0 immediately.');
+            const zeroReview = {
+                score: 0,
+                feedback: "No meaningful code was submitted. The editor still contains only the starter template or is empty. A real solution must be written to earn any score.",
+                strengths: [],
+                areasForImprovement: [
+                    "Write actual solution logic — even a brute-force O(n²) attempt earns partial credit.",
+                    "Simply submitting the default starter code (// your code here) always results in a 0.",
+                    "Use the Hint button if you're stuck to get guidance without giving away the answer."
+                ],
+                timeComplexity: "N/A - No code submitted",
+                spaceComplexity: "N/A - No code submitted"
+            };
+            const attempt = new Attempt({
+                userId: req.userId,
+                topic: question.topic || "General",
+                difficulty: question.difficulty || "Medium",
+                question: question.title,
+                code: code || '',
+                score: 0,
+                feedbackSummary: zeroReview.feedback,
+                strengths: [],
+                areasForImprovement: zeroReview.areasForImprovement
+            });
+            await attempt.save();
+            const interviewCount = await Attempt.countDocuments({ userId: req.userId });
+            const earned = await checkAchievements(user, { interviewsCount: interviewCount });
+            return res.json({ ...zeroReview, earnedAchievements: earned });
+        }
+
+        const codeToReview = code.trim();
+        const approachToReview = (approach && approach.trim()) ? approach.trim() : 'No explanation provided.';
+
+        const prompt = `You are a rigorous technical interviewer conducting a real coding interview. Your job is to evaluate submissions HONESTLY and STRICTLY.
+
+CRITICAL SCORING CONTRACT — you MUST follow these exactly:
+- Score 0: Code is blank, only comments, only the starter template, or has no logic added whatsoever.
+- Score 1-15: Code has some structure but contains no logic that works toward solving the problem.
+- Score 16-40: Code has a genuine attempt but is fundamentally broken or missing major parts.
+- Score 41-65: Code partially solves the problem — correct approach but has bugs or edge cases fail.
+- Score 66-85: Code is correct and mostly complete — minor inefficiencies or missed edge cases.
+- Score 86-100: Code is fully correct, well-written, and optimal complexity.
+
+DO NOT be encouraging or lenient. Score only what is literally written. Do not award points for what you "think" the candidate might have meant.
+
+Problem:
 ${JSON.stringify(question)}
 
-Language Use: ${language || 'Unknown'}
+Language: ${language || 'Unknown'}
 
-User's Code:
-${code || 'No code provided.'}
+Candidate's Code (judge ONLY this — nothing else):
+\`\`\`
+${codeToReview}
+\`\`\`
 
-User's Approach/Explanation:
-${approach || 'No explanation provided.'}
+Candidate's Verbal Explanation:
+${approachToReview}
 
-Provide your feedback in the following JSON format ONLY:
+Respond ONLY in this JSON format:
 {
-  "score": 85, // out of 100
-  "feedback": "Overall impression...",
-  "strengths": ["...", "..."],
-  "areasForImprovement": ["...", "..."],
-  "timeComplexity": "O(N) - explain why",
-  "spaceComplexity": "O(1) - explain why"
+  "score": <integer 0–100>,
+  "feedback": "<honest 2-3 sentence overall assessment>",
+  "strengths": ["<only real strengths, leave array empty if none>"],
+  "areasForImprovement": ["<specific actionable feedback>"],
+  "timeComplexity": "<O(...) with brief reason, or N/A>",
+  "spaceComplexity": "<O(...) with brief reason, or N/A>"
 }`;
 
         let reviewData = parseJSONResponse(await callAI(prompt, true));
+
+        // --- Post-AI score clamp (failsafe) ---
+        // If the AI still returns a suspiciously high score for what is clearly minimal code,
+        // we hard-clamp it. Real code with logic will have many more characters.
+        const finalCodeLength = codeToReview.replace(/\s/g, '').length;
+        if (finalCodeLength < 60 && reviewData.score > 15) {
+            console.warn(`[REVIEW] AI gave score ${reviewData.score} for ${finalCodeLength}-char code — clamping to 10.`);
+            reviewData.score = 10;
+            reviewData.feedback = "The submitted code is too minimal to demonstrate a real solution. " + reviewData.feedback;
+        }
 
         // Persistent persistence: Save the interview attempt
         const attempt = new Attempt({
@@ -294,11 +365,20 @@ Provide your feedback in the following JSON format ONLY:
         });
         await attempt.save();
 
+        // Award XP proportional to score (score >= 50 earns XP)
+        let xpEarned = 0;
+        if (reviewData.score >= 50) {
+            xpEarned = Math.round(reviewData.score * 2); // max 200 XP for a perfect interview
+            user.xp = (user.xp || 0) + xpEarned;
+            user.level = calculateLevel(user.xp);
+            await user.save();
+        }
+
         // Check achievements: Specifically count total interviews
         const interviewCount = await Attempt.countDocuments({ userId: req.userId });
         const earned = await checkAchievements(user, { interviewsCount: interviewCount });
 
-        res.json({ ...reviewData, earnedAchievements: earned });
+        res.json({ ...reviewData, xpEarned, totalXp: user.xp, level: user.level, earnedAchievements: earned });
     } catch (error) {
         console.error("[ERROR] Error reviewing submission:", error.message);
         console.error("[ERROR] Full error details:", error);

@@ -61,8 +61,8 @@ const Register = () => {
             zIndex: 50
         }}>
             {/* Orbs */}
-            <div className="orb orb-violet" style={{ width: '450px', height: '450px', top: '-100px', right: '-100px', opacity: 0.4 }} />
-            <div className="orb orb-cyan" style={{ width: '300px', height: '300px', bottom: '-50px', left: '-50px', opacity: 0.3 }} />
+            <div style={{ position: 'absolute', width: '450px', height: '450px', top: '-100px', right: '-100px', opacity: 0.4, borderRadius: '50%', background: 'radial-gradient(circle, rgba(124,58,237,0.25) 0%, transparent 70%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', width: '300px', height: '300px', bottom: '-50px', left: '-50px', opacity: 0.3, borderRadius: '50%', background: 'radial-gradient(circle, rgba(6,182,212,0.25) 0%, transparent 70%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
 
             <div className="slide-up" style={{ width: '100%', maxWidth: '500px', position: 'relative', zIndex: 1 }}>
                 {/* Header */}
