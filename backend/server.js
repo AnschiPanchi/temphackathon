@@ -13,6 +13,9 @@ import executeRoutes from './routes/execute.js';
 import onboardingRoutes from './routes/onboarding.js';
 import quizRoutes from './routes/quiz.js';
 import achievementRoutes from './routes/achievements.js';
+import jobRoutes from './routes/jobRoutes.js';
+import cron from 'node-cron';
+import { fetchAndMatchJobs } from './scripts/jobSync.js';
 
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -45,6 +48,13 @@ app.use('/api/execute', executeRoutes);
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/achievements', achievementRoutes);
+app.use('/api/jobs', jobRoutes);
+
+// Run every 2 minutes for testing
+cron.schedule('*/15 * * * *', () => {
+    console.log('Running scheduled AI Job Matching (Testing - Every 2 mins)...');
+    fetchAndMatchJobs();
+});
 
 // Initialize Socket.io Duel Logic
 duelSocket(io);

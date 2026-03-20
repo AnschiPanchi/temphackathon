@@ -2,8 +2,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from 'dotenv';
 dotenv.config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "", { apiVersion: "v1" });
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 /**
  * AI Judge Agent
@@ -95,7 +95,15 @@ export const virtualExecute = async (language, code, testCases) => {
         }
         throw new Error("Invalid AI Execution Response");
     } catch (err) {
-        console.error("Virtual Execution Failed:", err);
-        throw err;
+        console.error("Gemini API error:", err);
+        return {
+            stdout: "Code execution failed:\\n" + (err.message || "Unknown error"),
+            results: testCases.map(tc => ({
+                input: tc.input || "N/A",
+                status: "Error",
+                actual: "Execution failed before testing",
+                expected: tc.expectedOutput || "N/A"
+            }))
+        };
     }
 };

@@ -22,7 +22,10 @@ import Achievements from './pages/Achievements';
 import QuizBattleRoom from './pages/QuizBattleRoom';
 import TopicStudy from './pages/TopicStudy';
 import AdaptiveQuiz from './pages/AdaptiveQuiz';
+import AiMentor from './pages/AiMentor';
+import AiMentorPro from './pages/AiMentorPro';
 import OnboardingModal, { shouldShowOnboarding } from './components/OnboardingModal';
+import JobNotifier from './components/JobNotifier';
 import {
     Loader2, LogOut, Sun, Moon, Settings as SettingsIcon,
     Trophy, LayoutDashboard, User, Swords, Radar, Briefcase, Flame,
@@ -90,6 +93,9 @@ const Navigation = ({ theme, toggleTheme }) => {
                         <>
                             <NavLink to="/app" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                                 <LayoutDashboard size={15} /> Dashboard
+                            </NavLink>
+                            <NavLink to="/ai-mentor-pro" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} style={{ color: 'var(--violet-light)', fontWeight: 600 }}>
+                                <Sparkles size={15} /> AI Mentor <span className="badge badge-violet" style={{ fontSize: '0.6rem', padding: '0.1rem 0.3rem', marginLeft: '0.2rem' }}>PRO</span>
                             </NavLink>
 
                             <div className="nav-dropdown">
@@ -187,6 +193,7 @@ const AppContent = () => {
 
     return (
         <>
+            <JobNotifier />
             {showOnboarding && <OnboardingModal onClose={() => setShowOnboarding(false)} />}
             {!isFullscreen && <Navigation theme={theme} toggleTheme={toggleTheme} />}
             <div style={{ paddingTop: isFullscreen ? 0 : 'var(--nav-h)' }}>
@@ -216,6 +223,8 @@ const AppContent = () => {
                     <Route path="/community" element={<ProtectedRoute><CommunityQuests /></ProtectedRoute>} />
                     <Route path="/battle"   element={<ProtectedRoute><QuizBattleRoom /></ProtectedRoute>} />
                     <Route path="/quiz"     element={<ProtectedRoute><AdaptiveQuiz /></ProtectedRoute>} />
+                    <Route path="/ai-mentor" element={<ProtectedRoute><AiMentor /></ProtectedRoute>} />
+                    <Route path="/ai-mentor-pro" element={<ProtectedRoute><AiMentorPro /></ProtectedRoute>} />
                 </Routes>
             </div>
         </>

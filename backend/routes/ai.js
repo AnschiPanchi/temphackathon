@@ -2,6 +2,9 @@ import express from 'express';
 import OpenAI from 'openai';
 import Attempt from '../models/Attempt.js';
 import User from '../models/User.js';
+import JobMatch from '../models/JobMatch.js';
+import ProjectRecommendation from '../models/ProjectRecommendation.js';
+import PracticeTask from '../models/PracticeTask.js';
 import verifyToken from '../middleware/auth.js';
 import { checkAchievements } from '../utils/achievementEngine.js';
 
@@ -38,18 +41,36 @@ const parseJSONResponse = (text) => {
     }
 };
 
-router.post('/generate-question', async (req, res) => {
+router.post('/generate-question', verifyToken, async (req, res) => {
     try {
         const ai = getAi();
-        if (!ai) return res.status(503).json({ error: "AI API key not configured on server. Add GROQ_API_KEY or OPENAI_API_KEY to backend/.env" });
-        const { topic, difficulty, solvedQuestions = [] } = req.body;
+        if (!ai) return res.status(503).json({ error: "AI API key not configured on server." });
+        const { mode, topics = [], difficulty, solvedQuestions = [] } = req.body;
+
+        const user = await User.findById(req.userId);
+        
+        let targetTopics = topics;
+        if (mode === 'ai-recommended') {
+            const jobMatches = await JobMatch.find({ userId: req.userId }).select('missingSkills');
+            const missingSkills = [...new Set(jobMatches.flatMap(m => m.missingSkills || []))];
+            targetTopics = missingSkills.length > 0 ? missingSkills : ['General Problem Solving'];
+        }
 
         const avoidanceRule = solvedQuestions.length > 0
             ? `\nCRITICAL: DO NOT GENERATE ANY OF THE FOLLOWING QUESTIONS THAT THE CANDIDATE HAS ALREADY SOLVED:\n${solvedQuestions.map(q => `- ${q}`).join('\n')}\n`
             : '';
 
-        const prompt = `You are an expert technical interviewer. Generate a unique Data Structures and Algorithms (DSA) question.
-Topic: ${topic || 'General'}
+        const prompt = `You are an expert technical interviewer.
+        
+User Profile:
+Target Role: ${user?.targetJob || 'Software Engineer'}
+Selected Practice Topics: ${targetTopics.join(', ') || 'General Problem Solving'}
+
+Task:
+Generate a practice technical question related to these topics.
+If multiple topics are selected, combine them logically or focus on the most important one.
+Dynamically determine the domain (e.g., Web Development, Backend API, React, Blockchain, DSA, Databases, System Design). Do NOT default to DSA unless the selected topics specifically require algorithmic logic.
+
 Difficulty: ${difficulty || 'Medium'}
 ${avoidanceRule}
 
@@ -390,6 +411,231 @@ router.post('/study-guide', async (req, res) => {
     } catch (error) {
         console.error("Error generating study guide:", error);
         res.status(500).json({ error: "Failed to generate study guide: " + error.message });
+    }
+});
+
+router.get('/mentor/:userId', verifyToken, async (req, res) => {
+    try {
+        const ai = getAi();
+        if (!ai) return res.status(503).json({ error: "AI API key not configured on server." });
+        
+        // 1. Fetch User Data
+        const user = await User.findById(req.params.userId);
+        if (!user) return res.status(404).json({ error: "User not found" });
+
+        // 2. Fetch Job Match Data to find missing skills
+        const jobMatches = await JobMatch.find({ userId: req.params.userId }).select('missingSkills jobTitle company');
+        
+        let allMissingSkills = [];
+        let recommendedJobsContext = "";
+        
+        if (jobMatches.length > 0) {
+            jobMatches.forEach(match => {
+                if (match.missingSkills) allMissingSkills.push(...match.missingSkills);
+            });
+            // Grab a few recent job matches to add context
+            recommendedJobsContext = jobMatches.slice(0, 3).map(j => `${j.jobTitle} at ${j.company}`).join(', ');
+        }
+        
+        // Remove duplicate missing skills
+        const uniqueMissingSkills = [...new Set(allMissingSkills)];
+
+        // 3. Construct Context for Prompt
+        const profileContext = `
+            Target Role: ${user.targetJob || 'Unknown'}
+            Current Skills: ${user.skills?.join(', ') || 'None provided'}
+            Weak Topics (from mock interviews): ${user.weakTopics?.join(', ') || 'None recorded'}
+            Identified Missing Skills from Job Matches: ${uniqueMissingSkills.join(', ') || 'None currently'}
+            Recently Recommended Jobs: ${recommendedJobsContext || 'None yet'}
+        `;
+
+        // 4. Construct Prompt
+        const prompt = `You are a world-class Premium Career AI Mentor. 
+Your task is to provide personalized, actionable career guidance based on the user's data.
+
+User Profile Data:
+${profileContext}
+
+Provide the response in the following JSON format ONLY, without any markdown formatting or extra text:
+{
+  "nextSkills": [
+    "Skill 1: [Reason why they should learn it]",
+    "Skill 2: [Reason]"
+  ],
+  "projectIdeas": [
+    "1-2 sentence description of a portfolio project using their current and missing skills."
+  ],
+  "portfolioTips": [
+    "Actionable tip to improve their resume/portfolio."
+  ],
+  "linkedinPostIdeas": [
+    "Idea for a LinkedIn post to show authority and growth."
+  ],
+  "careerAdvice": "A highly motivational, specific paragraph summarizing their readiness and immediate next steps."
+}`;
+
+        // 5. Generate Response
+        const response = await ai.chat.completions.create({
+            model: getModel(),
+            messages: [{ role: "system", content: prompt }],
+            response_format: { type: "json_object" }
+        });
+
+        // 6. Return Structured JSON
+        let mentorAdvice = parseJSONResponse(response.choices[0].message.content);
+        res.json(mentorAdvice);
+
+    } catch (error) {
+        console.error("Error generating AI Mentor advice:", error);
+        res.status(500).json({ error: "Failed to generate AI Mentor advice: " + error.message });
+    }
+});
+
+router.get('/mentor-pro/:userId', verifyToken, async (req, res) => {
+    try {
+        const ai = getAi();
+        if (!ai) return res.status(503).json({ error: "AI API key not configured on server." });
+        
+        const user = await User.findById(req.params.userId);
+        if (!user) return res.status(404).json({ error: "User not found" });
+
+        const jobMatches = await JobMatch.find({ userId: req.params.userId }).select('missingSkills jobTitle');
+        const missingSkills = [...new Set(jobMatches.flatMap(m => m.missingSkills || []))];
+
+        const profileContext = `
+            Target Role: ${user.targetJob || 'Unknown'}
+            Current Skills: ${user.skills?.join(', ') || 'None provided'}
+            Identified Missing Skills from Job Matches: ${missingSkills.join(', ') || 'None currently'}
+        `;
+
+        const prompt = `You are an elite Career Mentor PRO. You must generate a highly actionable career plan based on this user profile:
+${profileContext}
+
+Return ONLY this fully structured JSON format:
+{
+  "careerAdvice": "A single, highly encouraging and motivational paragraph describing their career standing and what they should focus on.",
+  "roadmap": [
+    "Step 1: [Detailed action for their next phase]",
+    "Step 2: [Next logical step]",
+    "Step 3: [Final milestone to get the job]"
+  ],
+  "projectRecommendations": [
+    "Short description of a strong portfolio project involving their missing skills (e.g., 'Task Manager API using Node.js and MongoDB')"
+  ],
+  "linkedinSuggestions": [
+    "A practical idea for a LinkedIn post demonstrating authority and continuous learning."
+  ],
+  "nextSkills": [
+    "Skill 1", "Skill 2"
+  ]
+}`;
+
+        const response = await ai.chat.completions.create({
+            model: getModel(),
+            messages: [{ role: "system", content: prompt }],
+            response_format: { type: "json_object" }
+        });
+
+        let data = parseJSONResponse(response.choices[0].message.content);
+        res.json(data);
+
+    } catch (error) {
+        console.error("Error generating AI Mentor Pro advice:", error);
+        res.status(500).json({ error: "Failed to load AI Mentor Pro: " + error.message });
+    }
+});
+
+router.get('/projects/recommend/:userId', verifyToken, async (req, res) => {
+    try {
+        const ai = getAi();
+        if (!ai) return res.status(503).json({ error: "AI API key not configured on server" });
+        const user = await User.findById(req.params.userId);
+        
+        // Fetch JobMatches to find missing skills
+        const jobMatches = await JobMatch.find({ userId: req.params.userId }).select('missingSkills');
+        const missingSkills = [...new Set(jobMatches.flatMap(m => m.missingSkills || []))];
+
+        const prompt = `You are a Senior Career Mentor.
+        User Target Role: ${user?.targetJob || 'Software Engineer'}
+        Current Skills: ${user?.skills?.join(', ') || 'General basics'}
+        Missing Skills (Requires Practice): ${missingSkills.join(', ') || 'Advanced frameworks'}
+        
+        Generate exactly 3 project ideas that specifically incorporate their "Missing Skills" while leveraging their "Current Skills".
+        
+        Provide the response in the following JSON format ONLY:
+        {
+            "projects": [
+                {
+                    "title": "Short catchy project name (e.g. Real-time Crypto Tracker)",
+                    "description": "2-3 sentences explaining what this is and how it helps them learn the missing skill.",
+                    "targetSkills": ["Skill 1", "Skill 2"],
+                    "difficulty": "Medium",
+                    "category": "Web Development"
+                }
+            ]
+        }`;
+
+        const response = await ai.chat.completions.create({
+            model: getModel(),
+            messages: [{ role: "system", content: prompt }],
+            response_format: { type: "json_object" }
+        });
+
+        const data = parseJSONResponse(response.choices[0].message.content);
+        
+        await ProjectRecommendation.deleteMany({ userId: user._id }); // wipe old
+        const savedProjects = await Promise.all(
+            (data.projects || []).map(p => ProjectRecommendation.create({ userId: user._id, ...p }))
+        );
+
+        res.json(savedProjects);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/practice/generate-task', verifyToken, async (req, res) => {
+    try {
+        const ai = getAi();
+        if (!ai) return res.status(503).json({ error: "AI API key not configured on server" });
+        const { skill, targetJob } = req.body;
+
+        const prompt = `You are a Technical Assessment Generator.
+        The candidate is training for: "${targetJob || 'Software Engineer'}".
+        Their currently lacking skill is: "${skill}".
+
+        Determine the domain of this skill (DSA, Web Development, Blockchain, Databases, APIs, DevOps, or System Design).
+        Generate exactly ONE practical challenge for this specific skill.
+        DO NOT default to DSA unless the skill is a DSA concept. 
+
+        Provide the response in the following JSON format ONLY:
+        {
+            "category": "[The domain you assigned]",
+            "problemTitle": "Catchy short title",
+            "problemDescription": "Detailed scenario explaining the problem they need to solve using ${skill}. Include any constraints or specific instructions.",
+            "difficulty": "Medium"
+        }`;
+
+        const response = await ai.chat.completions.create({
+            model: getModel(),
+            messages: [{ role: "system", content: prompt }],
+            response_format: { type: "json_object" }
+        });
+
+        const data = parseJSONResponse(response.choices[0].message.content);
+
+        const newTask = await PracticeTask.create({
+            userId: req.userId,
+            skill: skill,
+            category: data.category,
+            problemTitle: data.problemTitle,
+            problemDescription: data.problemDescription,
+            difficulty: data.difficulty
+        });
+
+        res.json(newTask);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 

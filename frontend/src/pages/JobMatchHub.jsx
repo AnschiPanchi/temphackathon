@@ -1,9 +1,10 @@
-import React, { useState, useContext, useMemo } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import {
     Briefcase, Search, MapPin, Building2, ExternalLink, Filter,
-    RefreshCw, Zap, AlertCircle, CheckCircle2, ChevronRight
+    RefreshCw, Zap, AlertCircle, CheckCircle2, ChevronRight, Bell
 } from 'lucide-react';
 
 // ── Static job database (extend or replace with real API) ────────────────────
@@ -95,17 +96,74 @@ const JobMatchHub = () => {
     const [query, setQuery] = useState('');
     const [minMatch, setMinMatch] = useState(0);
     const [selectedJob, setSelectedJob] = useState(null);
+    const [fetchedJobs, setFetchedJobs] = useState([]);
+    const [notifications, setNotifications] = useState([]);
+    const [syncing, setSyncing] = useState(false);
+
+    useEffect(() => {
+        if (user?._id) {
+            axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/jobs/recommended/${user._id}`)
+                .then(res => setFetchedJobs(res.data))
+                .catch(err => console.error(err));
+            
+            axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/jobs/notifications/${user._id}`)
+                .then(res => setNotifications(res.data))
+                .catch(err => console.error(err));
+        }
+    }, [user?._id]);
+
+    const handleSync = async () => {
+        setSyncing(true);
+        try {
+            await axios.post(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/jobs/test-sync`, {
+                userId: user?._id
+            });
+
+            if (user?._id) {
+                 const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/jobs/recommended/${user._id}`);
+                 setFetchedJobs(res.data);
+                 const res2 = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/jobs/notifications/${user._id}`);
+                 setNotifications(res2.data);
+            }
+        } catch(e) { console.error(e) }
+        setSyncing(false);
+    };
+
+    const markNotificationRead = async (id) => {
+        try {
+            await axios.put(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/jobs/notifications/${id}/read`);
+            setNotifications(prev => prev.map(n => n._id === id ? { ...n, read: true } : n));
+        } catch (e) { console.error(e) }
+    };
 
     const hasProfile = (user?.skills?.length > 0) || user?.targetJob;
 
     // Compute matches only when user profile is available
     const jobsWithMatch = useMemo(() => {
         if (!hasProfile) return [];
-        return JOB_DATABASE.map(job => ({
-            ...job,
-            match: calculateMatch(job, user?.skills || [], user?.targetJob || ''),
-        })).sort((a, b) => (b.match || 0) - (a.match || 0));
-    }, [user?.skills, user?.targetJob]);
+        
+        // Only return fetched jobs if they exist.
+        // We no longer fallback to the hardcoded database to avoid confusion.
+        if (fetchedJobs && fetchedJobs.length > 0) {
+             return fetchedJobs.map(job => ({
+                  id: job._id || job.id,
+                  title: job.jobTitle,
+                  company: job.company,
+                  location: job.location || 'Remote',
+                  type: 'Remote',
+                  posted: 'Recently',
+                  applyUrl: job.applyLink,
+                  requiredSkills: job.requiredSkills || [],
+                  targetRole: user?.targetJob || '',
+                  description: job.description,
+                  match: Math.round(job.similarityScore * 100),
+                  missingSkills: job.missingSkills || []
+             })).sort((a, b) => b.match - a.match);
+        }
+        
+        return []; 
+    }, [user?.skills, user?.targetJob, fetchedJobs]);
+
 
     const filtered = jobsWithMatch
         .filter(j => minMatch === 0 || j.match >= minMatch)
@@ -161,6 +219,21 @@ const JobMatchHub = () => {
                         </div>
                         <h2 style={{ marginBottom: '0.4rem' }}>Smart <span className="text-gradient">Job Match</span></h2>
                         <p>Scores calculated using your actual skills and target role.</p>
+                        
+                        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <button className="btn btn-outline" onClick={handleSync} disabled={syncing}>
+                                <RefreshCw size={16} className={syncing ? 'loading-spin' : ''} />
+                                {syncing ? 'Scanning for Jobs...' : 'Trigger AI Job Sync'}
+                            </button>
+                            
+                            {notifications.filter(n => !n.read).map(notif => (
+                                <div key={notif._id} style={{ display: 'flex', gap: '0.5rem', background: 'rgba(59,130,246,0.1)', padding: '0.5rem 1rem', borderRadius: '8px', alignItems: 'center', fontSize: '0.8rem', color: 'var(--blue-light)' }}>
+                                    <Bell size={14} />
+                                    <span style={{ flex: 1 }}>{notif.message}</span>
+                                    <button onClick={() => markNotificationRead(notif._id)} style={{ background: 'transparent', border: 'none', color: 'var(--blue-light)', fontWeight: 'bold', cursor: 'pointer' }}>Mark Read</button>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                     {/* Profile summary */}
                     <div className="glass-panel" style={{ padding: '0.85rem 1.25rem', fontSize: '0.82rem' }}>
@@ -284,7 +357,7 @@ const JobMatchHub = () => {
                                 {/* Skill-by-skill breakdown */}
                                 <div className="section-label" style={{ marginBottom: '0.8rem' }}>Skill Analysis</div>
                                 <div style={{ display: 'grid', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                                    {selectedJob.requiredSkills.map(skill => {
+                                    {selectedJob.requiredSkills?.map(skill => {
                                         const userHas = (user?.skills || []).some(us =>
                                             us.toLowerCase().replace(/[.\s]/g, '').includes(skill.toLowerCase().replace(/[.\s]/g, '')) ||
                                             skill.toLowerCase().replace(/[.\s]/g, '').includes(us.toLowerCase().replace(/[.\s]/g, ''))
@@ -324,6 +397,16 @@ const JobMatchHub = () => {
                                             </div>
                                         );
                                     })}
+                                    {selectedJob.missingSkills?.map(skill => (
+                                        <div key={`missing-${skill}`} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', background: 'rgba(244,63,94,0.03)', borderRadius: '10px', border: '1px solid rgba(244,63,94,0.1)' }}>
+                                            <div style={{ color: 'var(--danger)' }}><AlertCircle size={16} /></div>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-sub)' }}>{skill}</div>
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--danger)', opacity: 0.8 }}>Missing skill (AI identified)</div>
+                                            </div>
+                                            <button className="btn btn-ghost btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.65rem', border: '1px solid rgba(244,63,94,0.3)' }} onClick={(e) => { e.stopPropagation(); navigate(`/setup?topic=${skill}`); }}>Practice →</button>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 

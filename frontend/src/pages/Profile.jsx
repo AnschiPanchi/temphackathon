@@ -231,70 +231,7 @@ const Profile = () => {
                 )}
             </div>
 
-            {/* AI Learning Path Panel */}
-            {user?.targetJob && (
-                <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem', border: '1px solid rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.03)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                        <div>
-                            <h3 style={{ fontSize: '1.1rem', margin: '0 0 0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Navigation size={18} color="#10b981" /> AI Skill Gap Analysis
-                            </h3>
-                            <p className="text-muted" style={{ margin: 0, fontSize: '0.875rem', maxWidth: '500px' }}>
-                                We noticed you're aiming to be a <strong>{user.targetJob}</strong>. Find out exactly what technical skills you are currently missing to reach that goal.
-                            </p>
-                        </div>
-                        <button onClick={getJobSkills} className="btn" disabled={jobSkillsLoading} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#10b981', color: '#000', fontWeight: 600 }}>
-                            {jobSkillsLoading ? 'Analyzing Resume...' : 'Generate Learning Path'}
-                        </button>
-                    </div>
-                    
-                    {jobSkillsError && <p style={{ color: 'var(--danger)', fontSize: '0.875rem', marginTop: '1rem' }}>{jobSkillsError}</p>}
-                    
-                    {jobSkills && (
-                        <div className="slide-up" style={{ marginTop: '1.5rem', padding: '1.25rem', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-md)', borderLeft: '4px solid #10b981' }}>
-                            <p style={{ margin: '0 0 1rem', fontSize: '0.95rem', color: 'var(--text-primary)', fontWeight: 500 }}>{jobSkills.verdict}</p>
-                            
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                {jobSkills.missingSkills?.map((item, idx) => (
-                                    <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-sm)' }}>
-                                        <CheckCircle2 size={18} color="#10b981" style={{ marginTop: '0.1rem', flexShrink: 0 }} />
-                                        <div>
-                                            <p style={{ margin: '0 0 0.2rem', fontWeight: 600, fontSize: '0.9rem', color: '#10b981' }}>{item.skill}</p>
-                                            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>{item.reason}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
 
-            {/* AI Recommendation Panel */}
-            <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem', border: '1px solid rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.03)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                    <div>
-                        <h3 style={{ fontSize: '1.1rem', margin: '0 0 0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <Sparkles size={18} color="#ec4899" /> AI Topic Recommendation
-                        </h3>
-                        <p className="text-muted" style={{ margin: 0, fontSize: '0.875rem', maxWidth: '500px' }}>
-                            Not sure what to practice next? Let our AI analyze your skills and performance to suggest the single most impactful interview topic for you to focus on right now.
-                        </p>
-                    </div>
-                    <button onClick={getRecommendation} className="btn btn-primary" disabled={recLoading} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        {recLoading ? 'Analyzing Profile...' : 'Get Recommendation'}
-                    </button>
-                </div>
-                
-                {recError && <p style={{ color: 'var(--danger)', fontSize: '0.875rem', marginTop: '1rem' }}>{recError}</p>}
-                
-                {recommendation && (
-                    <div className="slide-up" style={{ marginTop: '1.5rem', padding: '1.25rem', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-md)', borderLeft: '4px solid #ec4899' }}>
-                        <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: 'var(--text-primary)' }}>Suggested Topic: <strong style={{ color: '#ec4899' }}>{recommendation.topic}</strong></h4>
-                        <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{recommendation.reason}</p>
-                    </div>
-                )}
-            </div>
 
             {/* Stats row */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>

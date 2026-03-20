@@ -3,10 +3,7 @@ import User from '../models/User.js';
 import verifyToken from '../middleware/auth.js';
 import multer from 'multer';
 import fs from 'fs';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+import { PDFParse } from 'pdf-parse';
 
 const router = express.Router();
 
@@ -18,7 +15,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 router.post('/parse-resume', verifyToken, upload.single('resume'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     try {
-        const parsed = await pdfParse(req.file.buffer);
+        const parser = new PDFParse({ data: req.file.buffer });
+        const parsed = await parser.getText();
         const text = parsed.text.toLowerCase();
 
         // Comprehensive keyword-based skill extraction

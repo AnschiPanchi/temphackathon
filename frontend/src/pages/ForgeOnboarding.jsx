@@ -65,7 +65,7 @@ const ForgeOnboarding = () => {
             const { data } = await axios.post(
                 `${import.meta.env.VITE_API_BASE_URL}/api/onboarding/parse-resume`,
                 form,
-                { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
             setParsedSkills(data.skills || []);
         } catch (err) {
