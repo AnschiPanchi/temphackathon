@@ -6,6 +6,7 @@ import {
     Briefcase, Search, MapPin, Building2, ExternalLink, Filter,
     RefreshCw, Zap, AlertCircle, CheckCircle2, ChevronRight, Bell
 } from 'lucide-react';
+import ParticleNetwork from '../components/ParticleNetwork';
 
 // ── Static job database (extend or replace with real API) ────────────────────
 const JOB_DATABASE = [
@@ -176,6 +177,8 @@ const JobMatchHub = () => {
 
     // ── Profile not set up ────────────────────────────────────────────────────
     if (!hasProfile) return (
+        <>
+        <ParticleNetwork color="#a78bfa" />
         <div className="container" style={{ paddingTop: '3rem', paddingBottom: '3rem' }}>
             <div className="flex-center" style={{ minHeight: '60vh', flexDirection: 'column', gap: '1.5rem', textAlign: 'center' }}>
                 <div style={{ display: 'inline-flex', padding: '1.25rem', background: 'rgba(245,158,11,0.1)', borderRadius: '20px', color: 'var(--warning)' }}>
@@ -211,13 +214,16 @@ const JobMatchHub = () => {
                 </div>
             </div>
         </div>
+        </>
     );
 
     return (
+        <>
+        <ParticleNetwork color="#a78bfa" />
         <div className="container" style={{ paddingTop: '2rem', paddingBottom: '3rem' }}>
             <div className="slide-up">
                 {/* Header */}
-                <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
                     <div>
                         <div style={{ display: 'inline-flex', padding: '0.75rem', background: 'rgba(124,58,237,0.1)', borderRadius: '14px', color: 'var(--violet-light)', marginBottom: '1rem' }}>
                             <Briefcase size={26} />
@@ -307,7 +313,7 @@ const JobMatchHub = () => {
                     </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: selectedJob ? '1fr 420px' : '1fr', gap: '1.5rem', alignItems: 'start' }}>
+                <div className="job-match-layout" style={{ display: 'grid', gridTemplateColumns: selectedJob ? '1fr 420px' : '1fr', gap: '1.5rem', alignItems: 'start' }}>
                     {/* Jobs list */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                         {filtered.length === 0 ? (
@@ -365,17 +371,18 @@ const JobMatchHub = () => {
                     </div>
 
                     {/* Detail panel */}
-                    {selectedJob && (
-                        <div className="glass-panel" style={{ padding: '1.75rem', position: 'sticky', top: 'calc(var(--nav-h, 64px) + 1rem)' }}>
-                            <div style={{ marginBottom: '1.25rem' }}>
-                                <h3 style={{ marginBottom: '0.3rem', fontSize: '1.05rem' }}>{selectedJob.title}</h3>
-                                <p style={{ color: 'var(--violet-light)', fontWeight: 700, marginBottom: '0.6rem', fontSize: '0.9rem' }}>{selectedJob.company}</p>
-                                <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><MapPin size={11} />{selectedJob.location}</span>
-                                    <span>{selectedJob.type}</span>
-                                    <span>{selectedJob.posted}</span>
+                    <div className="job-detail-panel" style={{ flex: '0 0 350px' }}>
+                        {selectedJob && (
+                            <div className="glass-panel" style={{ padding: '1.75rem', position: 'sticky', top: '2rem' }}>
+                                <div style={{ marginBottom: '1.25rem' }}>
+                                    <h3 style={{ marginBottom: '0.3rem', fontSize: '1.05rem' }}>{selectedJob.title}</h3>
+                                    <p style={{ color: 'var(--violet-light)', fontWeight: 700, marginBottom: '0.6rem', fontSize: '0.9rem' }}>{selectedJob.company}</p>
+                                    <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><MapPin size={11} />{selectedJob.location}</span>
+                                        <span>{selectedJob.type}</span>
+                                        <span>{selectedJob.posted}</span>
+                                    </div>
                                 </div>
-                            </div>
 
                             <p style={{ fontSize: '0.875rem', color: 'var(--text-sub)', lineHeight: 1.7, marginBottom: '1.25rem' }}>{selectedJob.description}</p>
 
@@ -450,10 +457,12 @@ const JobMatchHub = () => {
                                 <button className="btn btn-ghost" onClick={() => setSelectedJob(null)} style={{ padding: '0.5rem 0.75rem' }}>✕</button>
                             </div>
                         </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
+        </>
     );
 };
 

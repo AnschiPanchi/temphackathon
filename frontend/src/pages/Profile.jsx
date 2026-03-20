@@ -149,10 +149,11 @@ const Profile = () => {
         <div className="slide-up" style={{ maxWidth: '860px', margin: '0 auto' }}>
             {/* Hero card */}
             <div className="glass-panel" style={{
-                padding: '2rem', marginBottom: '2rem',
+                padding: '1.5rem', marginBottom: '2rem',
                 background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(236,72,153,0.08))',
                 border: '1px solid rgba(139,92,246,0.25)',
                 display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap',
+                justifyContent: 'center', textAlign: 'center'
             }}>
                 {/* Avatar */}
                 <div style={{
@@ -164,69 +165,40 @@ const Profile = () => {
                 }}>
                     {user?.username?.[0]?.toUpperCase()}
                 </div>
-                <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.25rem' }}>
+                <div style={{ flex: '1 1 300px', minWidth: '280px', textAlign: 'left' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
                         <h2 style={{ margin: 0 }}>{user?.username}</h2>
-                        {user?.linkedin && (
-                            <a href={user.linkedin} target="_blank" rel="noreferrer" style={{ color: 'var(--text-muted)', transition: 'color 0.2s' }} onMouseEnter={e => e.currentTarget.style.color = '#0e76a8'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
-                                <Linkedin size={20} />
-                            </a>
-                        )}
-                        {user?.github && (
-                            <a href={user.github} target="_blank" rel="noreferrer" style={{ color: 'var(--text-muted)', transition: 'color 0.2s' }} onMouseEnter={e => e.currentTarget.style.color = '#ffffff'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
-                                <Github size={20} />
-                            </a>
-                        )}
-                    </div>
-                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
-                        {user?.currentStreak > 0 && (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--warning)', fontWeight: 600, fontSize: '0.875rem' }}>
-                                <Flame size={15} /> {user.currentStreak} day streak
-                            </span>
-                        )}
-                        <span className="text-muted" style={{ fontSize: '0.875rem' }}>
-                            {earnedBadges.length} badge{earnedBadges.length !== 1 ? 's' : ''} earned
-                        </span>
-                        <span className="text-muted" style={{ fontSize: '0.875rem' }}>
-                            Member since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'recently'}
-                        </span>
-                    </div>
-
-                    {user?.targetJob && (
-                        <div style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)', fontSize: '0.9rem', fontWeight: 500 }}>
-                            <Navigation size={16} /> Target Role: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{user.targetJob}</span>
+                        <div style={{ display: 'flex', gap: '0.75rem' }}>
+                            {user?.linkedin && (
+                                <a href={user.linkedin} target="_blank" rel="noreferrer" style={{ color: 'var(--text-muted)' }}>
+                                    <Linkedin size={18} />
+                                </a>
+                            )}
+                            {user?.github && (
+                                <a href={user.github} target="_blank" rel="noreferrer" style={{ color: 'var(--text-muted)' }}>
+                                    <Github size={18} />
+                                </a>
+                            )}
                         </div>
-                    )}
-                    
-                    {/* Skills map */}
-                    {user?.skills && user.skills.length > 0 && (
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-                            {user.skills.map((skill, i) => (
-                                <span key={i} style={{ 
-                                    padding: '0.2rem 0.6rem', backgroundColor: 'rgba(255,255,255,0.08)', 
-                                    border: '1px solid rgba(255,255,255,0.15)', borderRadius: '1rem', 
-                                    fontSize: '0.75rem', color: 'var(--text-primary)' 
-                                }}>
-                                    {skill}
-                                </span>
-                            ))}
-                        </div>
-                    )}
+                    </div>
+                    {/* ... rest of the meta ... */}
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem', fontSize: '0.85rem' }}>
+                        {user?.currentStreak > 0 && <span style={{ color: 'var(--warning)', fontWeight: 600 }}><Flame size={14} /> {user.currentStreak}d streak</span>}
+                        <span className="text-muted">{earnedBadges.length} badges</span>
+                    </div>
                 </div>
                 {/* Pass rate circle */}
                 {totalAttempts > 0 && (
-                    <div style={{ textAlign: 'center' }}>
+                    <div style={{ textAlign: 'center', flexShrink: 0 }}>
                         <div style={{
-                            width: '72px', height: '72px', borderRadius: '50%',
+                            width: '68px', height: '68px', borderRadius: '50%',
                             background: `conic-gradient(${passRate >= 70 ? 'var(--success)' : passRate >= 50 ? 'var(--warning)' : 'var(--danger)'} ${passRate * 3.6}deg, rgba(255,255,255,0.1) 0deg)`,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            position: 'relative',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative'
                         }}>
-                            <div style={{ width: '54px', height: '54px', borderRadius: '50%', backgroundColor: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.9rem' }}>
+                            <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
                                 {passRate}%
                             </div>
                         </div>
-                        <p className="text-muted" style={{ margin: '0.25rem 0 0', fontSize: '0.7rem' }}>pass rate</p>
                     </div>
                 )}
             </div>
@@ -251,7 +223,7 @@ const Profile = () => {
                 ))}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+            <div className="grid-stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
                 {/* Topic Breakdown */}
                 <div className="glass-panel" style={{ padding: '1.5rem' }}>
                     <h3 style={{ fontSize: '1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

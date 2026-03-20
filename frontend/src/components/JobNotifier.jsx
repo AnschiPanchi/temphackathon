@@ -13,6 +13,7 @@ const JobNotifier = () => {
         if (!user || !token) return;
 
         const checkNotifications = async () => {
+            if (!user?._id) return;
             try {
                 const res = await axios.get(
                     `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/jobs/notifications/${user._id}`,

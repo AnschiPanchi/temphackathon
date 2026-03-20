@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { UserPlus, Loader2, ShieldCheck, Eye, EyeOff, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { UserPlus, Loader2, ShieldCheck, Eye, EyeOff, ArrowRight, CheckCircle2, Lock, User, Mail } from 'lucide-react';
 
 const Register = () => {
     const [username, setUsername] = useState('');
@@ -28,6 +28,8 @@ const Register = () => {
     const strength = password.length === 0 ? 0
         : password.length < 6 ? 1
         : password.length < 10 ? 2 : 3;
+    const strengthLabels = ['', 'Weak', 'Medium', 'Strong'];
+    const strengthColors = ['', 'var(--danger)', 'var(--warning)', '#34d399'];
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -46,72 +48,109 @@ const Register = () => {
     };
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-            {/* Background blob */}
-            <div style={{ position: 'fixed', top: '-100px', right: '-100px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.1) 0%, transparent 70%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+        <div style={{ 
+            minHeight: '100vh',
+            width: '100%',
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            padding: '2rem 1.25rem',
+            background: 'var(--bg-base)',
+            position: 'relative',
+            zIndex: 50
+        }}>
+            {/* Orbs */}
+            <div className="orb orb-violet" style={{ width: '450px', height: '450px', top: '-100px', right: '-100px', opacity: 0.4 }} />
+            <div className="orb orb-cyan" style={{ width: '300px', height: '300px', bottom: '-50px', left: '-50px', opacity: 0.3 }} />
 
-            <div className="slide-up" style={{ width: '100%', maxWidth: '460px' }}>
+            <div className="slide-up" style={{ width: '100%', maxWidth: '500px', position: 'relative', zIndex: 1 }}>
                 {/* Header */}
                 <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-                    <Link to="/" style={{ textDecoration: 'none' }}>
-                        <span className="text-gradient" style={{ fontWeight: 800, fontSize: '1.35rem' }}>AlgoPrep AI</span>
+                    <Link to="/" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: '1.5rem' }}>
+                        <span className="text-gradient" style={{ fontWeight: 900, fontSize: '1.5rem', letterSpacing: '-0.04em' }}>AlgoPrep AI</span>
                     </Link>
-                    <div style={{ display: 'inline-flex', padding: '0.85rem', background: 'rgba(16,185,129,0.1)', borderRadius: '14px', color: 'var(--success)', margin: '1.25rem auto 1rem', width: 'fit-content' }}>
-                        <UserPlus size={26} />
+                    <div style={{
+                        display: 'inline-flex', padding: '0.9rem',
+                        background: 'rgba(16,185,129,0.08)', borderRadius: '16px',
+                        color: '#34d399', margin: '0 auto 1.25rem',
+                        border: '1px solid rgba(16,185,129,0.2)',
+                        boxShadow: '0 0 30px rgba(16,185,129,0.1)'
+                    }}>
+                        <UserPlus size={24} />
                     </div>
                     <h2 style={{ marginBottom: '0.4rem' }}>Create your account</h2>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Join the career-ready coding platform</p>
                 </div>
 
-                <div className="glass-panel" style={{ padding: '2.25rem' }}>
+                <div className="glass-panel" style={{ padding: '2.25rem', border: '1px solid rgba(255,255,255,0.07)' }}>
                     {error && (
                         <div className="error-banner" style={{ marginBottom: '1.5rem' }}>
                             <span>⚠</span> {error}
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                            <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div className="grid-stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
                                 <label className="form-label">Username</label>
-                                <input type="text" className="form-control" placeholder="johndev" value={username} onChange={e => setUsername(e.target.value)} required />
+                                <div style={{ position: 'relative' }}>
+                                    <User size={14} style={{ position: 'absolute', left: '0.9rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                    <input type="text" className="form-control" placeholder="johndev" value={username} onChange={e => setUsername(e.target.value)} required style={{ paddingLeft: '2.4rem' }} />
+                                </div>
                             </div>
-                            <div className="form-group" style={{ marginBottom: '1rem' }}>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
                                 <label className="form-label">Email</label>
-                                <input type="email" className="form-control" placeholder="john@dev.com" value={email} onChange={e => setEmail(e.target.value)} required />
+                                <div style={{ position: 'relative' }}>
+                                    <Mail size={14} style={{ position: 'absolute', left: '0.9rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                    <input type="email" className="form-control" placeholder="john@dev.com" value={email} onChange={e => setEmail(e.target.value)} required style={{ paddingLeft: '2.4rem' }} />
+                                </div>
                             </div>
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Password</label>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                <label className="form-label" style={{ marginBottom: 0 }}>Password</label>
+                                {password.length > 0 && (
+                                    <span style={{ fontSize: '0.68rem', color: strengthColors[strength], fontWeight: 700 }}>
+                                        {strengthLabels[strength]}
+                                    </span>
+                                )}
+                            </div>
                             <div style={{ position: 'relative' }}>
+                                <Lock size={14} style={{ position: 'absolute', left: '0.9rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                                 <input
                                     type={showPwd ? 'text' : 'password'}
                                     className="form-control" placeholder="min. 6 characters"
                                     value={password} onChange={e => setPassword(e.target.value)} required minLength={6}
-                                    style={{ paddingRight: '3rem' }}
+                                    style={{ paddingLeft: '2.4rem', paddingRight: '3rem' }}
                                 />
                                 <button type="button" onClick={() => setShowPwd(p => !p)}
-                                    style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}>
+                                    style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}>
                                     {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
                                 </button>
                             </div>
                             {password.length > 0 && (
-                                <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+                                <div style={{ display: 'flex', gap: '4px', marginTop: '7px' }}>
                                     {[1, 2, 3].map(level => (
-                                        <div key={level} style={{ flex: 1, height: '3px', borderRadius: '99px', background: strength >= level ? (level === 1 ? 'var(--danger)' : level === 2 ? 'var(--warning)' : 'var(--success)') : 'var(--border)', transition: 'var(--t-base)' }} />
+                                        <div key={level} style={{
+                                            flex: 1, height: '3px', borderRadius: '99px',
+                                            background: strength >= level ? strengthColors[strength] : 'rgba(255,255,255,0.07)',
+                                            transition: 'var(--t-base)',
+                                            boxShadow: strength >= level ? `0 0 8px ${strengthColors[strength]}60` : 'none'
+                                        }} />
                                     ))}
                                 </div>
                             )}
                         </div>
 
                         {/* Captcha */}
-                        <div style={{ margin: '1.25rem 0', padding: '1rem', background: 'rgba(255,255,255,0.025)', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
+                        <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--r-md)', border: '1px solid rgba(255,255,255,0.06)' }}>
                             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                                <ShieldCheck size={14} /> Human Verification
+                                <ShieldCheck size={13} /> Human Verification
                             </label>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, fontSize: '1.1rem', letterSpacing: '3px', padding: '0.5rem 1rem', background: 'rgba(0,0,0,0.3)', borderRadius: 'var(--r-sm)', color: 'var(--text-main)' }}>
+                                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, fontSize: '1.1rem', letterSpacing: '3px', padding: '0.5rem 1rem', background: 'rgba(0,0,0,0.4)', borderRadius: 'var(--r-sm)', color: 'var(--text-main)', border: '1px solid rgba(255,255,255,0.07)' }}>
                                     {captchaQuestion}
                                 </div>
                                 <span style={{ color: 'var(--text-muted)', fontSize: '1.3rem' }}>=</span>
@@ -123,21 +162,23 @@ const Register = () => {
                             </div>
                         </div>
 
-                        <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '0.875rem', fontSize: '0.95rem' }} disabled={loading}>
+                        <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '0.9rem', fontSize: '0.95rem' }} disabled={loading}>
                             {loading ? <Loader2 size={20} className="animate-spin" /> : <>Create Account <ArrowRight size={17} /></>}
                         </button>
                     </form>
 
-                    <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                    <div className="glow-divider" style={{ margin: '1.75rem 0 1.5rem' }} />
+
+                    <p style={{ textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
                         Already have an account?{' '}
-                        <Link to="/login" style={{ color: 'var(--violet-light)', textDecoration: 'none', fontWeight: 600 }}>Sign in</Link>
+                        <Link to="/login" style={{ color: 'var(--violet-light)', textDecoration: 'none', fontWeight: 700 }}>Sign in →</Link>
                     </p>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '1.5rem' }}>
                     {['Free forever', 'No credit card', 'AI-powered'].map(text => (
-                        <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            <CheckCircle2 size={13} color="var(--success)" /> {text}
+                        <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                            <CheckCircle2 size={12} color="#34d399" /> {text}
                         </div>
                     ))}
                 </div>

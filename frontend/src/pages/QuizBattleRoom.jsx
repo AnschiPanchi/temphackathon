@@ -118,7 +118,7 @@ const QuizBattleRoom = () => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-base)' }}>
             {/* Battle Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem 2.5rem', background: 'rgba(13,17,23,0.95)', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', background: 'rgba(13,17,23,0.95)', borderBottom: '1px solid var(--border)', gap: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div style={{ minWidth: '48px', height: '48px', borderRadius: '12px', background: 'rgba(16,185,129,0.1)', border: '1px solid var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: 'var(--success)', fontSize: '1.25rem' }}>
                         {myScore}
@@ -157,7 +157,7 @@ const QuizBattleRoom = () => {
                         <h2 style={{ fontSize: '1.75rem', lineHeight: 1.4 }}>{q.text}</h2>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="grid-stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         {q.options.map((opt, idx) => {
                             let bg = 'rgba(255,255,255,0.03)';
                             let border = '1px solid rgba(255,255,255,0.1)';

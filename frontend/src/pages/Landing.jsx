@@ -115,12 +115,15 @@ const Landing = () => {
                 </div>
 
                 {/* Stats bar */}
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '0', maxWidth: '700px', margin: '4rem auto 0', animation: 'fadeUp 0.5s 0.2s var(--ease) both' }}>
+                <div className="flex-responsive" style={{ display: 'flex', justifyContent: 'center', gap: '0', maxWidth: '750px', margin: '4rem auto 0', animation: 'fadeUp 0.5s 0.2s var(--ease) both' }}>
                     {STATS.map(({ value, label, icon }, i) => (
                         <div key={label} style={{
                             flex: 1, padding: '1.2rem 0.5rem', textAlign: 'center',
                             borderRight: i < STATS.length - 1 ? '1px solid var(--border)' : 'none',
-                        }}>
+                            borderBottom: 'none'
+                        }}
+                        className="stat-item-mobile"
+                        >
                             <div style={{ color: 'var(--violet-light)', marginBottom: '0.3rem', display: 'flex', justifyContent: 'center' }}>{icon}</div>
                             <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.03em' }}>{value}</div>
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{label}</div>
@@ -154,7 +157,7 @@ const Landing = () => {
                     </div>
 
                     {/* Dashboard preview content */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.85rem', marginBottom: '1rem' }}>
+                    <div className="grid-responsive-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', marginBottom: '1rem' }}>
                         {[
                             { label: 'Avg Score', val: '87/100', color: 'var(--violet-light)', bg: 'rgba(124,58,237,0.1)' },
                             { label: 'Problems Solved', val: '142', color: 'var(--success)', bg: 'rgba(16,185,129,0.1)' },
@@ -203,7 +206,7 @@ const Landing = () => {
                     </p>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}
                     className="stagger">
                     {FEATURES.map(({ icon, gradient, glow, title, desc }) => (
                         <div key={title} className="glass-panel slide-up" style={{ padding: '1.75rem', position: 'relative', overflow: 'hidden' }}
@@ -246,7 +249,7 @@ const Landing = () => {
                     padding: '3rem',
                     background: 'linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(219,39,119,0.08) 100%)',
                     border: '1px solid rgba(124,58,237,0.25)',
-                    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', alignItems: 'center',
+                    display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '3rem', alignItems: 'center',
                     borderRadius: '24px',
                 }}>
                     <div>

@@ -38,6 +38,20 @@ const DuelRoom = () => {
 
     const timerRef = useRef(null);
     const socketRef = useRef(null);
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+    const [activeTab, setActiveTab] = useState('problem'); // 'problem' or 'code'
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    useEffect(() => {
+        if (duelResult) {
+            setActiveTab('problem');
+        }
+    }, [duelResult]);
 
     useEffect(() => {
         if (!token) return;
@@ -119,7 +133,8 @@ const DuelRoom = () => {
 
     // ── LOBBY UI ─────────────────────────────────────────────────────────────
     if (phase === 'lobby') return (
-        <div className="container" style={{ paddingTop: '4rem' }}>
+        <>
+            <div className="container" style={{ position: 'relative', zIndex: 1, paddingTop: '4rem' }}>
             <div className="slide-up" style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
                 <div style={{ display: 'inline-flex', padding: '1.25rem', background: 'rgba(219,39,119,0.1)', borderRadius: '24px', marginBottom: '1.5rem', color: 'var(--pink-light)', border: '1px solid rgba(219,39,119,0.2)' }}>
                     <Swords size={40} />
@@ -129,7 +144,7 @@ const DuelRoom = () => {
                     Challenge a friend or a random opponent in a real-time DSA battle. AI judges your quality.
                 </p>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                <div className="grid-stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
                     <div className="glass-panel" style={{ padding: '2.5rem' }}>
                         <h3 style={{ marginBottom: '1rem' }}>Host a Battle</h3>
                         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Create a unique room link to invite your opponent.</p>
@@ -154,11 +169,13 @@ const DuelRoom = () => {
                 </div>
             </div>
         </div>
+        </>
     );
 
     // ── WAITING UI ───────────────────────────────────────────────────────────
     if (phase === 'waiting') return (
-        <div className="flex-center" style={{ minHeight: '80vh', flexDirection: 'column', gap: '2rem' }}>
+        <>
+        <div className="flex-center" style={{ position: 'relative', zIndex: 1, minHeight: '80vh', flexDirection: 'column', gap: '2rem' }}>
             <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', maxWidth: '480px', width: '100%' }}>
                 <div className="spinner" style={{ width: '50px', height: '50px', margin: '0 auto 2rem' }}></div>
                 <h2 style={{ marginBottom: '1rem' }}>Waiting for Opponent</h2>
@@ -173,12 +190,13 @@ const DuelRoom = () => {
                 </div>
             </div>
         </div>
+        </>
     );
 
     // ── DUEL UI ──────────────────────────────────────────────────────────────
     if (phase === 'duel' || phase === 'judging') return (
         <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-base)' }}>
-            <div style={{ height: '60px', background: 'rgba(13,17,23,0.98)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2rem' }}>
+            <div style={{ minHeight: '60px', background: 'rgba(13,17,23,0.98)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1.5rem', gap: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <div className="pulse-dot" style={{ background: 'var(--success)' }}></div>
@@ -218,8 +236,37 @@ const DuelRoom = () => {
                 </div>
             </div>
 
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '380px 1fr', overflow: 'hidden' }}>
-                <div style={{ padding: '2rem', borderRight: '1px solid var(--border)', background: 'rgba(0,0,0,0.2)', overflowY: 'auto' }}>
+            {/* Mobile Tab Switcher */}
+            <div className="show-mobile" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', padding: '0.5rem 1.5rem', background: 'var(--bg-base)', borderBottom: '1px solid var(--border)' }}>
+                <button 
+                    className={`btn ${activeTab === 'problem' ? 'btn-primary' : 'btn-ghost'}`} 
+                    onClick={() => setActiveTab('problem')}
+                    style={{ flex: 1, margin: 0 }}
+                >
+                    {phase === 'result' ? 'Results' : 'Problem'}
+                </button>
+                <button 
+                    className={`btn ${activeTab === 'code' ? 'btn-primary' : 'btn-ghost'}`} 
+                    onClick={() => setActiveTab('code')}
+                    style={{ flex: 1, margin: 0 }}
+                >
+                    Editor
+                </button>
+            </div>
+
+            <div className="duel-main-layout" style={{ 
+                flex: 1, 
+                display: 'grid', 
+                gridTemplateColumns: isMobile ? '1fr' : '380px 1fr', 
+                overflow: isMobile ? 'visible' : 'hidden' 
+            }}>
+                <div style={{ 
+                    display: (isMobile && activeTab !== 'problem') ? 'none' : 'block',
+                    padding: '2rem', 
+                    borderRight: isMobile ? 'none' : '1px solid var(--border)', 
+                    background: 'rgba(0,0,0,0.2)', 
+                    overflowY: 'auto' 
+                }}>
                     <div className="badge badge-success" style={{ marginBottom: '1rem' }}>{problem.difficulty}</div>
                     <h2 style={{ marginBottom: '1rem', fontSize: '1.25rem' }}>{problem.title}</h2>
                     <p style={{ color: 'var(--text-sub)', lineHeight: 1.8, fontSize: '0.95rem', marginBottom: '2rem' }}>{problem.desc}</p>
@@ -238,7 +285,11 @@ const DuelRoom = () => {
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ 
+                    display: (isMobile && activeTab !== 'code') ? 'none' : 'flex',
+                    flexDirection: 'column',
+                    minHeight: isMobile ? '600px' : '0'
+                }}>
                     {phase === 'judging' ? (
                         <div className="flex-center" style={{ flex: 1, flexDirection: 'column', gap: '1.5rem', background: 'rgba(0,0,0,0.4)' }}>
                             <Loader2 size={48} className="animate-spin" color="var(--violet-light)" />
@@ -279,7 +330,7 @@ const DuelRoom = () => {
                     <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>AI evaluation complete for Room {roomId}</p>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '3rem' }}>
+                <div className="grid-stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '3rem' }}>
                     {[
                         { name: players[0]?.username, score: duelResult.p1, isYou: players[0]?.username === user.username },
                         { name: players[1]?.username, score: duelResult.p2, isYou: players[1]?.username === user.username }

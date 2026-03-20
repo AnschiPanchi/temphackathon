@@ -97,19 +97,19 @@ const AdaptiveQuiz = () => {
     return (
         <div className="container" style={{ paddingTop: '3rem', paddingBottom: '3rem' }}>
             <div className="slide-up" style={{ maxWidth: '720px', margin: '0 auto' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', gap: '1rem' }}>
                     <div>
                         <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <Target color="var(--pink-light)" /> Adaptive Trainer
                         </h2>
                         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>Powered by Spaced Repetition (SM-2)</p>
                     </div>
-                    <div className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', fontSize: '0.9rem' }}>
+                    <div className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', fontSize: '0.9rem', width: 'fit-content' }}>
                         <Brain size={16} /> Ability Score: {result ? result.abilityScore : (user?.abilityScore || 5)}/10
                     </div>
                 </div>
 
-                <div className="glass-panel" style={{ padding: '2.5rem', position: 'relative', overflow: 'hidden' }}>
+                <div className="glass-panel" style={{ padding: '2.5rem', position: 'relative' }}>
                     <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: `var(--diff-${question.difficulty_level <= 3 ? 'easy' : question.difficulty_level <= 7 ? 'medium' : 'hard'})` }} />
                     
                     <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>

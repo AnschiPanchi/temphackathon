@@ -45,7 +45,7 @@ const Achievements = () => {
                         Track your career milestones and unlock exclusive badges. Flex your progress and showcase your DSA mastery.
                     </p>
 
-                    <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                    <div className="glass-panel flex-responsive" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '2rem' }}>
                         <div style={{ textAlign: 'center' }}>
                             <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--violet-light)' }}>{earnedCount}</div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unlocked</div>
@@ -68,7 +68,7 @@ const Achievements = () => {
                         <span>Polishing your trophies...</span>
                     </div>
                 ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                    <div className="grid-stack-mobile" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
                         {achievements.map((a) => (
                             <div 
                                 key={a.id} 

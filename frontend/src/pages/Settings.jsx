@@ -123,16 +123,16 @@ const Settings = () => {
             </div>
 
             {/* Current account info */}
-            <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 <div style={{
-                    width: '48px', height: '48px', borderRadius: '50%',
+                    width: '44px', height: '44px', borderRadius: '50%',
                     background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 700, fontSize: '1.2rem', flexShrink: 0,
+                    fontWeight: 700, fontSize: '1.1rem', flexShrink: 0,
                 }}>
                     {user?.username?.[0]?.toUpperCase()}
                 </div>
-                <div>
+                <div style={{ flex: 1, minWidth: '150px' }}>
                     <p style={{ margin: 0, fontWeight: 600 }}>{user?.username}</p>
                     <p className="text-muted" style={{ margin: 0, fontSize: '0.8rem' }}>Current account</p>
                 </div>
@@ -160,7 +160,7 @@ const Settings = () => {
                             }}
                         />
                     </div>
-                    <button type="submit" className="btn btn-primary" disabled={usernameLoading || !newUsername.trim()} style={{ alignSelf: 'flex-start', padding: '0.6rem 1.5rem' }}>
+                    <button type="submit" className="btn btn-primary" disabled={usernameLoading || !newUsername.trim()} style={{ padding: '0.6rem 1.5rem', width: 'fit-content' }}>
                         {usernameLoading ? 'Saving...' : 'Update Username'}
                     </button>
                 </form>
@@ -194,7 +194,7 @@ const Settings = () => {
                             />
                         </div>
                     ))}
-                    <button type="submit" className="btn btn-primary" disabled={passwordLoading || !currentPassword || !newPassword || !confirmPassword} style={{ alignSelf: 'flex-start', padding: '0.6rem 1.5rem' }}>
+                    <button type="submit" className="btn btn-primary" disabled={passwordLoading || !currentPassword || !newPassword || !confirmPassword} style={{ padding: '0.6rem 1.5rem', width: 'fit-content' }}>
                         {passwordLoading ? 'Changing...' : 'Change Password'}
                     </button>
                 </form>
@@ -267,7 +267,7 @@ const Settings = () => {
                             }}
                         />
                     </div>
-                    <button type="submit" className="btn btn-primary" disabled={profileLoading} style={{ alignSelf: 'flex-start', padding: '0.6rem 1.5rem' }}>
+                    <button type="submit" className="btn btn-primary" disabled={profileLoading} style={{ padding: '0.6rem 1.5rem', width: 'fit-content' }}>
                         {profileLoading ? 'Saving...' : 'Save Profile'}
                     </button>
                 </form>

@@ -34,6 +34,15 @@ const InterviewRoom = () => {
     const MAX_HINTS = 3;
     const HINT_PENALTY = 5;
 
+    const [activeTab, setActiveTab] = useState('problem'); // 'problem' or 'code'
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     useEffect(() => {
         if (!question) navigate('/setup');
     }, [question, navigate]);
@@ -58,6 +67,12 @@ const InterviewRoom = () => {
         }, 1000);
         return () => clearInterval(timerId);
     }, [timeLeft, feedback, isSubmitting]);
+
+    useEffect(() => {
+        if (feedback) {
+            setActiveTab('problem');
+        }
+    }, [feedback]);
 
     useEffect(() => {
         const handleExitRequest = () => {
@@ -207,8 +222,8 @@ const InterviewRoom = () => {
             )}
             {!feedback && <ChatAssistant question={question} />}
 
-            <div className="slide-up">
-                <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+            <div className="slide-up" style={{ paddingBottom: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem', flexWrap: 'wrap' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                         <h2 style={{ fontSize: '1.25rem', margin: 0 }}>{question.title}</h2>
                         <span style={{
@@ -242,10 +257,39 @@ const InterviewRoom = () => {
                     </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(400px, 1fr) 1.5fr', gap: '1.5rem', height: 'calc(100vh - 160px)' }}>
+                {/* Mobile Tab Switcher */}
+                <div className="show-mobile" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', position: 'sticky', top: '74px', zIndex: 10, background: 'var(--bg-base)', padding: '0.5rem 0' }}>
+                    <button 
+                        className={`btn ${activeTab === 'problem' ? 'btn-primary' : 'btn-ghost'}`} 
+                        onClick={() => setActiveTab('problem')}
+                        style={{ flex: 1, margin: 0 }}
+                    >
+                        {feedback ? 'Feedback' : 'Problem'}
+                    </button>
+                    <button 
+                        className={`btn ${activeTab === 'code' ? 'btn-primary' : 'btn-ghost'}`} 
+                        onClick={() => setActiveTab('code')}
+                        style={{ flex: 1, margin: 0 }}
+                    >
+                        Editor
+                    </button>
+                </div>
+
+                <div className="interview-grid" style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: isMobile ? '1fr' : 'minmax(400px, 1fr) 1.5fr', 
+                    gap: '1.5rem', 
+                    height: isMobile ? 'auto' : 'calc(100vh - 160px)' 
+                }}>
 
                     {/* Left Column: Problem & Feedback */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                    <div style={{ 
+                        display: (isMobile && activeTab !== 'problem') ? 'none' : 'flex', 
+                        flexDirection: 'column', 
+                        gap: '1.5rem', 
+                        overflowY: 'auto', 
+                        paddingRight: isMobile ? 0 : '0.5rem' 
+                    }}>
                         {!feedback ? (
                             <>
                                 {/* Problem Description */}
@@ -383,7 +427,13 @@ const InterviewRoom = () => {
                     </div>
 
                     {/* Right Column: Code Editor & Runner */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+                    <div style={{ 
+                        display: (isMobile && activeTab !== 'code') ? 'none' : 'flex', 
+                        flexDirection: 'column', 
+                        gap: '1rem', 
+                        height: isMobile ? 'auto' : '100%',
+                        minHeight: isMobile ? '1000px' : '0'
+                    }}>
                         <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0, flex: 1 }}>
                             <div className="flex-between" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
@@ -442,7 +492,7 @@ const InterviewRoom = () => {
                                     </div>
                                 )}
                             </div>
-                            <div style={{ flex: 1, minHeight: 0 }}>
+                            <div style={{ flex: 1, minHeight: isMobile ? '500px' : '300px' }}>
                                 <Editor
                                     height="100%"
                                     language={language}
@@ -565,7 +615,7 @@ const InterviewRoom = () => {
                                                 </span>
                                             </div>
 
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                            <div className="grid-stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                                                 <div>
                                                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Input</div>
                                                     <code style={{ fontSize: '0.75rem', display: 'block', backgroundColor: 'rgba(0,0,0,0.3)', padding: '0.3rem', borderRadius: '4px' }}>
@@ -574,7 +624,7 @@ const InterviewRoom = () => {
                                                 </div>
                                                 <div>
                                                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Expected</div>
-                                                    <code style={{ fontSize: '0.75rem', display: 'block', backgroundColor: 'rgba(0,0,0,0.3)', padding: '0.3rem', borderRadius: '4px' }}>
+                                                    <code style={{ fontSize: '0.75rem', display: 'block', backgroundColor: 'rgba(0,0,0,0.3)', padding: '0.3rem', borderRadius: '4px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                                                         {typeof tc.expectedOutput === 'object' ? JSON.stringify(tc.expectedOutput) : String(tc.expectedOutput)}
                                                     </code>
                                                 </div>

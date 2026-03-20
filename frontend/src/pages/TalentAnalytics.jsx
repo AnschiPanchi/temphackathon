@@ -185,7 +185,7 @@ const TalentAnalytics = () => {
                 ) : (
                     <>
                         {/* Top Metrics Row */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+                        <div className="grid-stack-mobile" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
                             <div className="glass-panel" style={{ padding: '1.75rem', borderLeft: '4px solid var(--violet-light)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                 <div style={{ padding: '1rem', background: 'rgba(124, 58, 237, 0.15)', borderRadius: '12px', color: 'var(--violet-light)' }}>
                                     <Clock size={28} />
@@ -221,7 +221,7 @@ const TalentAnalytics = () => {
                         {sessions.length >= 3 && (
                             <div style={{ marginBottom: '2rem' }}>
                                 <div className="section-label">Your Insights</div>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                                <div className="grid-stack-mobile" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
                                     {weakest && weakest.avg < 80 && (
                                         <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: '3px solid var(--danger)' }}>
                                             <p style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--danger)', margin: '0 0 0.4rem', fontWeight: 700 }}>Needs Attention</p>

@@ -67,7 +67,8 @@ const PracticeHub = () => {
     }
 
     return (
-        <div className="container" style={{ paddingTop: '2rem', paddingBottom: '4rem' }}>
+        <>
+        <div className="container" style={{ position: 'relative', zIndex: 1, paddingTop: '2rem', paddingBottom: '4rem' }}>
             <div className="slide-up">
                 <div style={{ marginBottom: '2.5rem' }}>
                     <div style={{ display: 'inline-flex', padding: '0.75rem', background: 'rgba(124,58,237,0.1)', borderRadius: '14px', color: 'var(--violet-light)', marginBottom: '1rem' }}>
@@ -77,7 +78,7 @@ const PracticeHub = () => {
                     <p className="text-muted">Targeted training to bridge your skill gaps and ace interviews.</p>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', flexWrap: 'wrap' }}>
+                <div className="grid-stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
                     
                     {/* Weakness Targeting */}
                     <div>
@@ -91,14 +92,23 @@ const PracticeHub = () => {
                                     <p style={{ fontSize: '0.9rem' }}>No critical weaknesses found yet! Keep practicing to maintain your edge.</p>
                                 </div>
                             ) : weakTopics.map(t => (
-                                <div key={t.topic} className="glass-panel" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div key={t.topic} className="glass-panel flex-responsive" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
                                     <div>
                                         <h4 style={{ margin: '0 0 0.25rem' }}>{t.topic}</h4>
                                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
                                             Avg Score: <span style={{ color: 'var(--danger)', fontWeight: 700 }}>{t.avg}%</span> • {t.count} attempts
                                         </p>
                                     </div>
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <div className="show-mobile" style={{ width: '100%' }}>
+                                        <button 
+                                            className="btn btn-primary btn-sm"
+                                            style={{ width: '100%' }}
+                                            onClick={() => navigate(`/study?topic=${t.topic}`)}
+                                        >
+                                            Learn Now →
+                                        </button>
+                                    </div>
+                                    <div className="hide-mobile" style={{ display: 'flex', gap: '0.5rem' }}>
                                         <button 
                                             className="btn btn-ghost btn-sm"
                                             onClick={() => navigate(`/study?topic=${t.topic}`)}
@@ -136,12 +146,21 @@ const PracticeHub = () => {
                                     <button className="btn btn-primary btn-sm" onClick={() => navigate('/setup')} style={{ marginTop: '0.5rem' }}>Start Interview →</button>
                                 </div>
                             ) : missingSkills.map(s => (
-                                <div key={s.skill} className="glass-panel" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div key={s.skill} className="glass-panel flex-responsive" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
                                     <div style={{ flex: 1, paddingRight: '1rem' }}>
                                         <h4 style={{ margin: '0 0 0.25rem' }}>{s.skill}</h4>
                                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>{s.reason}</p>
                                     </div>
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <div className="show-mobile" style={{ width: '100%' }}>
+                                        <button 
+                                            className="btn btn-primary btn-sm"
+                                            style={{ width: '100%' }}
+                                            onClick={() => navigate(`/study?topic=${s.skill}`)}
+                                        >
+                                            Learn Now →
+                                        </button>
+                                    </div>
+                                    <div className="hide-mobile" style={{ display: 'flex', gap: '0.5rem' }}>
                                         <button 
                                             className="btn btn-ghost btn-sm"
                                             onClick={() => navigate(`/study?topic=${s.skill}`)}
@@ -184,6 +203,7 @@ const PracticeHub = () => {
                 </div>
             </div>
         </div>
+        </>
     );
 };
 

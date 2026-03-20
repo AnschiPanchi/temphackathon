@@ -511,16 +511,15 @@ router.get('/mentor-pro/:userId', verifyToken, async (req, res) => {
         const prompt = `You are an elite Career Mentor PRO. You must generate a highly actionable career plan based on this user profile:
 ${profileContext}
 
-Return ONLY this fully structured JSON format:
+CRITICAL: Return ONLY this fully structured JSON format. NEVER wrap in markdown blocks like \`\`\`json. Return pure JSON string:
 {
   "careerAdvice": "A single, highly encouraging and motivational paragraph describing their career standing and what they should focus on.",
   "roadmap": [
     "Step 1: [Detailed action for their next phase]",
-    "Step 2: [Next logical step]",
-    "Step 3: [Final milestone to get the job]"
+    "Step 2: [Next logical step]"
   ],
   "projectRecommendations": [
-    "Short description of a strong portfolio project involving their missing skills (e.g., 'Task Manager API using Node.js and MongoDB')"
+    "Short description of a strong portfolio project involving their missing skills"
   ],
   "linkedinSuggestions": [
     "A practical idea for a LinkedIn post demonstrating authority and continuous learning."
@@ -532,8 +531,7 @@ Return ONLY this fully structured JSON format:
 
         const response = await ai.chat.completions.create({
             model: getModel(),
-            messages: [{ role: "system", content: prompt }],
-            response_format: { type: "json_object" }
+            messages: [{ role: "system", content: prompt }]
         });
 
         let data = parseJSONResponse(response.choices[0].message.content);

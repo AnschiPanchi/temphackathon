@@ -129,7 +129,7 @@ const InterviewSetup = () => {
                     <p className="text-muted">Choose how you want to practice your technical skills.</p>
                 </div>
 
-                <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+                <div className="flex-responsive" style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
                     <div 
                         onClick={() => setMode('ai-recommended')}
                         style={{
@@ -212,7 +212,7 @@ const InterviewSetup = () => {
                 <form onSubmit={handleStart}>
                     <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                         <label className="form-label">Difficulty Level</label>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                        <div className="grid-stack-mobile" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
                             {difficulties.map(({ level, color }) => (
                                 <div
                                     key={level}
@@ -235,7 +235,7 @@ const InterviewSetup = () => {
 
                     <div className="form-group">
                         <label className="form-label">Time Limit (Minutes)</label>
-                        <div style={{ display: 'flex', gap: '1rem' }}>
+                        <div className="flex-responsive" style={{ display: 'flex', gap: '1rem' }}>
                             {durations.map(duration => (
                                 <div
                                     key={duration}

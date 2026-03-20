@@ -71,7 +71,7 @@ const AiMentor = () => {
                         </div>
 
                         {/* Two Column Grid */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                        <div className="grid-stack-mobile" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
                             
                             {/* Skills */}
                             <div className="glass-panel" style={{ padding: '1.5rem' }}>

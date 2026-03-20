@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { Sparkles, Map, Lightbulb, Hexagon, Linkedin, Brain, ArrowRight } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
+import ParticleNetwork from '../components/ParticleNetwork';
 
 const AiMentorPro = () => {
     const { user } = useContext(AuthContext);
@@ -44,6 +45,8 @@ const AiMentorPro = () => {
     if (!data) return null;
 
     return (
+        <>
+        <ParticleNetwork color="#ec4899" />
         <div className="container slide-up" style={{ paddingTop: '2rem', paddingBottom: '4rem', maxWidth: '900px' }}>
             
             <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
@@ -55,7 +58,7 @@ const AiMentorPro = () => {
             </div>
 
             {/* Next Skills and Advice Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 1fr) 2fr', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+            <div className="grid-stack-mobile" style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 1fr) 2fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 <div className="glass-panel" style={{ padding: '2rem', borderTop: '4px solid var(--violet-light)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', color: 'var(--violet-light)' }}>
                         <Hexagon size={24} />
@@ -107,7 +110,7 @@ const AiMentorPro = () => {
             </div>
 
             {/* Projects & LinkedIn Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+            <div className="grid-stack-mobile" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
                 <div className="glass-panel" style={{ padding: '2rem', borderTop: '4px solid var(--success)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', color: 'var(--success)' }}>
                         <Lightbulb size={24} />
@@ -138,6 +141,7 @@ const AiMentorPro = () => {
             </div>
 
         </div>
+        </>
     );
 };
 

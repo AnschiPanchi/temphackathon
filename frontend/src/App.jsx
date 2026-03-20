@@ -26,11 +26,16 @@ import AiMentor from './pages/AiMentor';
 import AiMentorPro from './pages/AiMentorPro';
 import OnboardingModal, { shouldShowOnboarding } from './components/OnboardingModal';
 import JobNotifier from './components/JobNotifier';
+import StarField from './components/StarField';
+import Aurora from './components/Aurora';
 import {
-    Loader2, LogOut, Sun, Moon, Settings as SettingsIcon,
-    Trophy, LayoutDashboard, User, Swords, Radar, Briefcase, Flame,
-    Code2, Brain, Sparkles, ChevronDown
+    Loader2, Menu, X
 } from 'lucide-react';
+import Navigation from './components/Navigation';
+import TopNavbar from './components/TopNavbar';
+import GridBackground from './components/GridBackground';
+import playSound from './utils/sounds';
+import LogoutModal from './components/LogoutModal';
 
 const getInitialTheme = () => localStorage.getItem('theme') || 'dark';
 const applyTheme = (theme) => {
@@ -49,140 +54,17 @@ const ProtectedRoute = ({ children }) => {
     return children;
 };
 
-const Navigation = ({ theme, toggleTheme }) => {
-    const { user, logout } = useContext(AuthContext);
-    const location = useLocation();
-    const isInterviewActive = location.pathname === '/interview';
-    const [scrolled, setScrolled] = useState(false);
-
-    useEffect(() => {
-        const handler = () => setScrolled(window.scrollY > 8);
-        window.addEventListener('scroll', handler, { passive: true });
-        return () => window.removeEventListener('scroll', handler);
-    }, []);
-
-    const handleLogoClick = (e) => {
-        if (isInterviewActive) {
-            e.preventDefault();
-            window.dispatchEvent(new CustomEvent('request-interview-exit'));
-        }
-    };
-
-    return (
-        <header className="navbar" style={scrolled ? { boxShadow: '0 4px 30px rgba(0,0,0,0.35)' } : {}}>
-            <div className="navbar-inner">
-                {/* Brand */}
-                <Link to="/" onClick={handleLogoClick} style={{ textDecoration: 'none' }} className="nav-brand">
-                    <h1 className="text-gradient" style={{ fontSize: '1.4rem', margin: 0, fontWeight: 800 }}>AlgoPrep AI</h1>
-                    <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: 0, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Career-Ready Platform</p>
-                </Link>
-
-                {/* Nav links */}
-                <nav className="nav-links">
-                    {/* Theme toggle */}
-                    <button
-                        onClick={toggleTheme}
-                        className="btn btn-ghost btn-icon"
-                        title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-                        style={{ marginRight: '0.25rem' }}
-                    >
-                        {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-                    </button>
-
-                    {user ? (
-                        <>
-                            <NavLink to="/app" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                                <LayoutDashboard size={15} /> Dashboard
-                            </NavLink>
-                            <NavLink to="/ai-mentor-pro" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} style={{ color: 'var(--violet-light)', fontWeight: 600 }}>
-                                <Sparkles size={15} /> AI Mentor <span className="badge badge-violet" style={{ fontSize: '0.6rem', padding: '0.1rem 0.3rem', marginLeft: '0.2rem' }}>PRO</span>
-                            </NavLink>
-
-                            <div className="nav-dropdown">
-                                <button className="nav-dropdown-btn">
-                                    <Brain size={15} /> Practice <ChevronDown size={14} />
-                                </button>
-                                <div className="nav-dropdown-content">
-                                    <NavLink to="/community" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                                        <Sparkles size={15} /> System Quests
-                                    </NavLink>
-                                    <NavLink to="/battle" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                                        <Flame size={15} /> Quiz Battle
-                                    </NavLink>
-                                </div>
-                            </div>
-
-                            <div className="nav-dropdown">
-                                <button className="nav-dropdown-btn">
-                                    <Swords size={15} /> Compete <ChevronDown size={14} />
-                                </button>
-                                <div className="nav-dropdown-content">
-                                    <NavLink to="/duel" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                                        <Swords size={15} /> Code Duel
-                                    </NavLink>
-                                    <NavLink to="/leaderboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                                        <Trophy size={15} /> Rankings
-                                    </NavLink>
-                                </div>
-                            </div>
-
-                            <div className="nav-dropdown">
-                                <button className="nav-dropdown-btn">
-                                    <Briefcase size={15} /> Career <ChevronDown size={14} />
-                                </button>
-                                <div className="nav-dropdown-content">
-                                    <NavLink to="/talent" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                                        <Radar size={15} /> Analytics
-                                    </NavLink>
-                                    <NavLink to="/achievements" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                                        <Trophy size={15} /> Achievements
-                                    </NavLink>
-                                    <NavLink to="/practice" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                                        <Brain size={15} /> Practice Hub
-                                    </NavLink>
-                                    <NavLink to="/jobs" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                                        <Briefcase size={15} /> Jobs
-                                    </NavLink>
-                                    <NavLink to="/profile" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                                        <User size={15} /> Profile
-                                    </NavLink>
-                                </div>
-                            </div>
-                            <NavLink to="/settings" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                                <SettingsIcon size={15} />
-                            </NavLink>
-                            <Link to="/setup" className="btn btn-primary btn-sm" style={{ marginLeft: '0.5rem', textDecoration: 'none' }}>
-                                New Interview
-                            </Link>
-                            <button
-                                onClick={logout}
-                                className="btn btn-ghost btn-icon"
-                                title="Logout"
-                                style={{ marginLeft: '0.25rem', color: 'var(--danger)' }}
-                            >
-                                <LogOut size={17} />
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <Link to="/login" className="nav-link" style={{ textDecoration: 'none' }}>Log In</Link>
-                            <Link to="/register" className="btn btn-primary btn-sm" style={{ textDecoration: 'none', marginLeft: '0.25rem' }}>
-                                Get Started
-                            </Link>
-                        </>
-                    )}
-                </nav>
-            </div>
-        </header>
-    );
-};
 
 const AppContent = () => {
-    const { user, loading } = useContext(AuthContext);
+    const { user, logout, loading } = useContext(AuthContext);
     const [showOnboarding, setShowOnboarding] = useState(false);
+    const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
     const [theme, setTheme] = useState(getInitialTheme);
     const location = useLocation();
     const isFullscreen = ['/interview'].includes(location.pathname);
+    const normalizedPath = location.pathname.toLowerCase().replace(/\/$/, '');
+    const isAuthPage = ['/login', '/register', '/forgot-password', '/reset-password'].includes(normalizedPath) || location.pathname === '/login' || location.pathname === '/register';
+    const isLandingPage = normalizedPath === '' || location.pathname === '/';
 
     useEffect(() => { applyTheme(theme); }, [theme]);
     const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
@@ -191,12 +73,118 @@ const AppContent = () => {
         if (!loading && user && shouldShowOnboarding()) setShowOnboarding(true);
     }, [user, loading]);
 
+    // Global Interaction Sounds
+    useEffect(() => {
+        const handleGlobalClick = (e) => {
+            const target = e.target.closest('button, a, .btn, .sidebar-link');
+            if (target) {
+                playSound('click');
+            }
+        };
+
+        window.addEventListener('click', handleGlobalClick);
+        return () => window.removeEventListener('click', handleGlobalClick);
+    }, []);
+
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const showSidebar = !isFullscreen && !isAuthPage && !!user && !isLandingPage;
+    
     return (
         <>
+            <style>{`
+                ${isAuthPage ? `
+                #main-app-container {
+                    padding-left: 0 !important;
+                    margin-left: 0 !important;
+                }
+                .sidebar {
+                    display: none !important;
+                }
+                ` : ''}
+                @media (max-width: 768px) {
+                    #main-app-container { padding-left: 0 !important; }
+                }
+            `}</style>
+            <GridBackground />
             <JobNotifier />
             {showOnboarding && <OnboardingModal onClose={() => setShowOnboarding(false)} />}
-            {!isFullscreen && <Navigation theme={theme} toggleTheme={toggleTheme} />}
-            <div style={{ paddingTop: isFullscreen ? 0 : 'var(--nav-h)' }}>
+            
+            {/* Mobile Hamburger Header */}
+            {showSidebar && (
+                <div className="show-mobile" style={{ 
+                    position: 'fixed', top: 0, left: 0, right: 0, height: '64px', 
+                    background: 'var(--bg-sidebar)', backdropFilter: 'blur(20px)',
+                    borderBottom: '1px solid var(--border)', zIndex: 1100,
+                    display: 'flex', alignItems: 'center', padding: '0 1.5rem',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+                }}>
+                    <Link to="/" onClick={() => setIsMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
+                        <span className="text-gradient" style={{ fontWeight: 900, fontSize: '1.25rem', letterSpacing: '-0.02em' }}>AlgoPrep</span>
+                    </Link>
+                    <button 
+                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                        className="btn-icon"
+                        style={{ 
+                            background: 'rgba(255,255,255,0.05)', 
+                            border: '1px solid var(--border)', 
+                            color: 'var(--text-main)', 
+                            cursor: 'pointer',
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                    >
+                        {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+                    </button>
+                </div>
+            )}
+
+            {/* Conditional Navigation */}
+            {isLandingPage && !user ? (
+                <TopNavbar theme={theme} toggleTheme={toggleTheme} />
+            ) : (
+                showSidebar && (
+                    <div className={`sidebar-wrapper ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
+                         {/* Mobile Overlay */}
+                        {isMobileMenuOpen && (
+                            <div 
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 999 }}
+                            />
+                        )}
+                        <Navigation 
+                            theme={theme} 
+                            toggleTheme={toggleTheme} 
+                            onLogoutClick={() => setIsLogoutModalOpen(true)}
+                            isMobileOpen={isMobileMenuOpen}
+                            onCloseMobile={() => setIsMobileMenuOpen(false)}
+                        />
+                    </div>
+                )
+            )}
+            <LogoutModal 
+                isOpen={isLogoutModalOpen} 
+                onClose={() => setIsLogoutModalOpen(false)} 
+                onConfirm={() => {
+                    logout();
+                    setIsLogoutModalOpen(false);
+                    setIsMobileMenuOpen(false);
+                }}
+            />
+            <div 
+                id="main-app-container"
+                style={{ 
+                    paddingLeft: showSidebar ? 'var(--sidebar-width)' : 0,
+                    paddingTop: (showSidebar && window.innerWidth <= 768) ? '60px' : 0,
+                    transition: 'padding 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    minHeight: '100vh',
+                    width: '100%'
+                }}
+            >
                 <Routes>
                     {/* Public */}
                     <Route path="/" element={user && !loading ? <Navigate to="/app" replace /> : <Landing />} />
