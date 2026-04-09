@@ -1,6 +1,5 @@
 import express from 'express';
 import OpenAI from 'openai';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import Attempt from '../models/Attempt.js';
 import User from '../models/User.js';
 import JobMatch from '../models/JobMatch.js';
@@ -8,11 +7,11 @@ import ProjectRecommendation from '../models/ProjectRecommendation.js';
 import PracticeTask from '../models/PracticeTask.js';
 import verifyToken from '../middleware/auth.js';
 import { checkAchievements } from '../utils/achievementEngine.js';
-import { calculateLevel } from '../utils/leveling.js';
 
 const router = express.Router();
 
-// Primary: Groq (using 8b-instant = 500k TPD limit, vs 70b = 100k TPD)
+// Helper to get AI instance safely when the route is called
+// It checks for Groq first, then OpenAI fallback.
 const getAi = () => {
     if (process.env.GROQ_API_KEY) {
         return new OpenAI({
@@ -27,59 +26,10 @@ const getAi = () => {
     return null;
 };
 
-// Fallback: Gemini (used when Groq hits rate limits)
-const getGemini = () => {
-    if (process.env.GEMINI_API_KEY) {
-        return new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    }
-    return null;
+const getModel = () => {
+    // We default to llama 3.3 for Groq and gpt-4o-mini for OpenAI to ensure speed and low cost
+    return process.env.GROQ_API_KEY ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
 };
-
-// Call Gemini with a plain text prompt, returns response text
-const callGemini = async (prompt) => {
-    const genAI = getGemini();
-    if (!genAI) throw new Error('Gemini API key not configured');
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const result = await model.generateContent(prompt);
-    return result.response.text();
-};
-
-const GROQ_PRIMARY = 'llama-3.3-70b-versatile';
-const GROQ_FALLBACK = 'llama-3.1-8b-instant'; // reliable free-tier fallback
-
-const callAI = async (prompt, useJsonFormat = true) => {
-    const ai = getAi();
-    if (ai) {
-        const tryGroq = async (modelName) => {
-            const params = {
-                model: modelName,
-                messages: [{ role: 'system', content: prompt }],
-            };
-            if (useJsonFormat) params.response_format = { type: 'json_object' };
-            const response = await ai.chat.completions.create(params);
-            return response.choices[0].message.content;
-        };
-
-        try {
-            console.log(`[AI] Attempting primary model: ${GROQ_PRIMARY}`);
-            return await tryGroq(GROQ_PRIMARY);
-        } catch (err) {
-            console.warn(`[AI] Primary model ${GROQ_PRIMARY} failed: ${err.message}. Trying fallback ${GROQ_FALLBACK}...`);
-            try {
-                return await tryGroq(GROQ_FALLBACK);
-            } catch (err2) {
-                console.warn(`[AI] Groq fallback failed: ${err2.message}. Moving to Gemini...`);
-                // Fall through to Gemini below
-            }
-        }
-    }
-
-    // Gemini fallback: Always try this if Groq fails or is not configured
-    console.log('[AI] Falling back to Gemini...');
-    return callGemini(prompt);
-};
-
-const getModel = () => GROQ_PRIMARY;
 
 // Helper to safely parse JSON from AI response, stripping markdown formatting if present
 const parseJSONResponse = (text) => {
@@ -221,10 +171,25 @@ Provide the response in the following JSON format ONLY:
         const model = getModel();
         console.log('[DEBUG] Using AI model:', model);
         
-        const rawContent = await callAI(prompt, true);
+        let response;
+        try {
+            // Try with strict JSON format first (preferred)
+            response = await ai.chat.completions.create({
+                model: model,
+                messages: [{ role: "system", content: prompt }],
+                response_format: { type: "json_object" }
+            });
+        } catch (jsonError) {
+            console.warn('[WARN] JSON format not supported, retrying without strict format:', jsonError.message);
+            // Fallback: try without strict JSON format
+            response = await ai.chat.completions.create({
+                model: model,
+                messages: [{ role: "system", content: prompt }]
+            });
+        }
 
         console.log('[DEBUG] API response received, parsing...');
-        let questionData = parseJSONResponse(rawContent);
+        let questionData = parseJSONResponse(response.choices[0].message.content);
         console.log('[DEBUG] Question generated successfully:', questionData.title);
         res.json(questionData);
     } catch (error) {
@@ -240,109 +205,53 @@ Provide the response in the following JSON format ONLY:
 
 router.post('/review', verifyToken, async (req, res) => {
     try {
+        const ai = getAi();
+        if (!ai) return res.status(503).json({ error: "AI API key not configured on server" });
         const { question, language, code, approach } = req.body;
 
         const user = await User.findById(req.userId);
         if (!user) return res.status(404).json({ error: "User not found" });
 
-        // --- Server-side empty/placeholder code detection ---
-        // Remove ALL whitespace to detect if any real logic exists beyond boilerplate
-        const strippedCode = (code || '').replace(/\s/g, '');
-        const starterPatterns = [
-            /\/\/yourcode(here)?/i,
-            /#yourcode(here)?/i,
-            /\/\/TODO/i,
-            /returnundefined/i,
-            /returnnull/i,
-        ];
-        // Code is effectively empty if: no meaningful content, or only starter template patterns
-        const isEffectivelyEmpty =
-            !code ||
-            !code.trim() ||
-            strippedCode.length < 20 ||
-            starterPatterns.some(p => p.test(strippedCode));
+        const prompt = `You are a supportive but rigorous technical interviewer. 
+Review the following user submission for a DSA problem.
 
-        // Empty code ALWAYS gets 0 — approach text does NOT save you
-        if (isEffectivelyEmpty) {
-            console.log('[REVIEW] Empty/starter code detected, returning score 0 immediately.');
-            const zeroReview = {
-                score: 0,
-                feedback: "No meaningful code was submitted. The editor still contains only the starter template or is empty. A real solution must be written to earn any score.",
-                strengths: [],
-                areasForImprovement: [
-                    "Write actual solution logic — even a brute-force O(n²) attempt earns partial credit.",
-                    "Simply submitting the default starter code (// your code here) always results in a 0.",
-                    "Use the Hint button if you're stuck to get guidance without giving away the answer."
-                ],
-                timeComplexity: "N/A - No code submitted",
-                spaceComplexity: "N/A - No code submitted"
-            };
-            const attempt = new Attempt({
-                userId: req.userId,
-                topic: question.topic || "General",
-                difficulty: question.difficulty || "Medium",
-                question: question.title,
-                code: code || '',
-                score: 0,
-                feedbackSummary: zeroReview.feedback,
-                strengths: [],
-                areasForImprovement: zeroReview.areasForImprovement
-            });
-            await attempt.save();
-            const interviewCount = await Attempt.countDocuments({ userId: req.userId });
-            const earned = await checkAchievements(user, { interviewsCount: interviewCount });
-            return res.json({ ...zeroReview, earnedAchievements: earned });
-        }
-
-        const codeToReview = code.trim();
-        const approachToReview = (approach && approach.trim()) ? approach.trim() : 'No explanation provided.';
-
-        const prompt = `You are a rigorous technical interviewer conducting a real coding interview. Your job is to evaluate submissions HONESTLY and STRICTLY.
-
-CRITICAL SCORING CONTRACT — you MUST follow these exactly:
-- Score 0: Code is blank, only comments, only the starter template, or has no logic added whatsoever.
-- Score 1-15: Code has some structure but contains no logic that works toward solving the problem.
-- Score 16-40: Code has a genuine attempt but is fundamentally broken or missing major parts.
-- Score 41-65: Code partially solves the problem — correct approach but has bugs or edge cases fail.
-- Score 66-85: Code is correct and mostly complete — minor inefficiencies or missed edge cases.
-- Score 86-100: Code is fully correct, well-written, and optimal complexity.
-
-DO NOT be encouraging or lenient. Score only what is literally written. Do not award points for what you "think" the candidate might have meant.
-
-Problem:
+Problem: 
 ${JSON.stringify(question)}
 
-Language: ${language || 'Unknown'}
+Language Use: ${language || 'Unknown'}
 
-Candidate's Code (judge ONLY this — nothing else):
-\`\`\`
-${codeToReview}
-\`\`\`
+User's Code:
+${code || 'No code provided.'}
 
-Candidate's Verbal Explanation:
-${approachToReview}
+User's Approach/Explanation:
+${approach || 'No explanation provided.'}
 
-Respond ONLY in this JSON format:
+Provide your feedback in the following JSON format ONLY:
 {
-  "score": <integer 0–100>,
-  "feedback": "<honest 2-3 sentence overall assessment>",
-  "strengths": ["<only real strengths, leave array empty if none>"],
-  "areasForImprovement": ["<specific actionable feedback>"],
-  "timeComplexity": "<O(...) with brief reason, or N/A>",
-  "spaceComplexity": "<O(...) with brief reason, or N/A>"
+  "score": 85, // out of 100
+  "feedback": "Overall impression...",
+  "strengths": ["...", "..."],
+  "areasForImprovement": ["...", "..."],
+  "timeComplexity": "O(N) - explain why",
+  "spaceComplexity": "O(1) - explain why"
 }`;
 
-        let reviewData = parseJSONResponse(await callAI(prompt, true));
-
-        // --- Post-AI score clamp (failsafe) ---
-        // If the AI still returns a suspiciously high score for what is clearly minimal code,
-        // we hard-clamp it. Real code with logic will have many more characters.
-        const finalCodeLength = codeToReview.replace(/\s/g, '').length;
-        if (finalCodeLength < 60 && reviewData.score > 15) {
-            console.warn(`[REVIEW] AI gave score ${reviewData.score} for ${finalCodeLength}-char code — clamping to 10.`);
-            reviewData.score = 10;
-            reviewData.feedback = "The submitted code is too minimal to demonstrate a real solution. " + reviewData.feedback;
+        let response;
+        try {
+            response = await ai.chat.completions.create({
+                model: getModel(),
+                messages: [{ role: "system", content: prompt }],
+                response_format: { type: "json_object" }
+            });
+        } catch (jsonError) {
+            console.warn('[WARN] JSON format not supported in /review, retrying without strict format:', jsonError.message);
+            response = await ai.chat.completions.create({
+                model: getModel(),
+                messages: [{ role: "system", content: prompt }]
+            });
         }
+
+        let reviewData = parseJSONResponse(response.choices[0].message.content);
 
         // Persistent persistence: Save the interview attempt
         const attempt = new Attempt({
@@ -358,20 +267,11 @@ Respond ONLY in this JSON format:
         });
         await attempt.save();
 
-        // Award XP proportional to score (score >= 50 earns XP)
-        let xpEarned = 0;
-        if (reviewData.score >= 50) {
-            xpEarned = Math.round(reviewData.score * 2); // max 200 XP for a perfect interview
-            user.xp = (user.xp || 0) + xpEarned;
-            user.level = calculateLevel(user.xp);
-            await user.save();
-        }
-
         // Check achievements: Specifically count total interviews
         const interviewCount = await Attempt.countDocuments({ userId: req.userId });
         const earned = await checkAchievements(user, { interviewsCount: interviewCount });
 
-        res.json({ ...reviewData, xpEarned, totalXp: user.xp, level: user.level, earnedAchievements: earned });
+        res.json({ ...reviewData, earnedAchievements: earned });
     } catch (error) {
         console.error("[ERROR] Error reviewing submission:", error.message);
         console.error("[ERROR] Full error details:", error);
@@ -408,7 +308,22 @@ Give ONE short but useful hint (2-3 sentences max).
 
 Respond in JSON: { "hint": "your hint here" }`;
 
-        let hintData = parseJSONResponse(await callAI(prompt, true));
+        let response;
+        try {
+            response = await ai.chat.completions.create({
+                model: getModel(),
+                messages: [{ role: "system", content: prompt }],
+                response_format: { type: "json_object" }
+            });
+        } catch (jsonError) {
+            console.warn('[WARN] JSON format not supported in /hint, retrying without strict format:', jsonError.message);
+            response = await ai.chat.completions.create({
+                model: getModel(),
+                messages: [{ role: "system", content: prompt }]
+            });
+        }
+
+        let hintData = parseJSONResponse(response.choices[0].message.content);
         res.json({ hint: hintData.hint });
     } catch (error) {
         console.error('[ERROR] Error generating hint:', error.message);
@@ -443,10 +358,12 @@ Rules:
             { role: "user", content: message }
         ];
 
-        // For chat we pass the full messages array; use callAI with a combined prompt
-        const combinedPrompt = messages.map(m => `[${m.role}]: ${m.content}`).join('\n');
-        const reply = await callAI(combinedPrompt, false);
-        res.json({ reply: reply.trim() });
+        const response = await ai.chat.completions.create({
+            model: getModel(),
+            messages,
+        });
+
+        res.json({ reply: response.choices[0].message.content.trim() });
     } catch (error) {
         console.error('Chat error:', error);
         res.status(500).json({ error: 'Failed to get AI response' });
@@ -507,7 +424,13 @@ Provide the response in the following JSON format ONLY, without any markdown for
   "reason": "A motivational, personalized 1-2 sentence explanation of why this topic is perfect for them based on their specific weak areas, target job, or skillset."
 }`;
 
-        let data = parseJSONResponse(await callAI(prompt, true));
+        const response = await ai.chat.completions.create({
+            model: getModel(),
+            messages: [{ role: "system", content: prompt }],
+            response_format: { type: "json_object" }
+        });
+
+        let data = parseJSONResponse(response.choices[0].message.content);
         res.json(data);
     } catch (error) {
         console.error("Error generating topic recommendation:", error);
@@ -545,7 +468,13 @@ Provide the response in the following JSON format ONLY, without any markdown for
   ]
 }`;
 
-        let data = parseJSONResponse(await callAI(prompt, true));
+        const response = await ai.chat.completions.create({
+            model: getModel(),
+            messages: [{ role: "system", content: prompt }],
+            response_format: { type: "json_object" }
+        });
+
+        let data = parseJSONResponse(response.choices[0].message.content);
         res.json(data);
     } catch (error) {
         console.error("Error generating skill gap:", error);
@@ -555,6 +484,8 @@ Provide the response in the following JSON format ONLY, without any markdown for
 
 router.post('/study-guide', async (req, res) => {
     try {
+        const ai = getAi();
+        if (!ai) return res.status(503).json({ error: "AI API key not configured on server" });
         const { topic } = req.body;
 
         const prompt = `You are an expert technical coach. Create a comprehensive, concise study guide for the topic: "${topic}".
@@ -579,7 +510,13 @@ router.post('/study-guide', async (req, res) => {
           }
         }`;
 
-        let data = parseJSONResponse(await callAI(prompt, true));
+        const response = await ai.chat.completions.create({
+            model: getModel(),
+            messages: [{ role: "system", content: prompt }],
+            response_format: { type: "json_object" }
+        });
+
+        let data = parseJSONResponse(response.choices[0].message.content);
         res.json(data);
     } catch (error) {
         console.error("Error generating study guide:", error);
@@ -646,8 +583,18 @@ Provide the response in the following JSON format ONLY, without any markdown for
   "careerAdvice": "A highly motivational, specific paragraph summarizing their readiness and immediate next steps."
 }`;
 
+        if (!ai) {
+            return res.json(buildMentorFallback(user, uniqueMissingSkills, recommendedJobsContext));
+        }
+
         try {
-            const content = await callAI(prompt, true);
+            const response = await ai.chat.completions.create({
+                model: getModel(),
+                messages: [{ role: "system", content: prompt }],
+                response_format: { type: "json_object" }
+            });
+
+            const content = response?.choices?.[0]?.message?.content || '';
             let mentorAdvice = parseJSONResponse(content);
             return res.json(mentorAdvice);
         } catch (aiError) {
@@ -698,8 +645,18 @@ CRITICAL: Return ONLY this fully structured JSON format. NEVER wrap in markdown 
   ]
 }`;
 
+        if (!ai) {
+            return res.json(buildMentorProFallback(user, missingSkills));
+        }
+
         try {
-            const content = await callAI(prompt, true);
+            const response = await ai.chat.completions.create({
+                model: getModel(),
+                messages: [{ role: "system", content: prompt }],
+                response_format: { type: "json_object" }
+            });
+
+            const content = response?.choices?.[0]?.message?.content || '';
             let data = parseJSONResponse(content);
             return res.json(data);
         } catch (aiError) {
@@ -715,6 +672,8 @@ CRITICAL: Return ONLY this fully structured JSON format. NEVER wrap in markdown 
 
 router.get('/projects/recommend/:userId', verifyToken, async (req, res) => {
     try {
+        const ai = getAi();
+        if (!ai) return res.status(503).json({ error: "AI API key not configured on server" });
         const user = await User.findById(req.params.userId);
         
         // Fetch JobMatches to find missing skills
@@ -741,7 +700,13 @@ router.get('/projects/recommend/:userId', verifyToken, async (req, res) => {
             ]
         }`;
 
-        const data = parseJSONResponse(await callAI(prompt, true));
+        const response = await ai.chat.completions.create({
+            model: getModel(),
+            messages: [{ role: "system", content: prompt }],
+            response_format: { type: "json_object" }
+        });
+
+        const data = parseJSONResponse(response.choices[0].message.content);
         
         await ProjectRecommendation.deleteMany({ userId: user._id }); // wipe old
         const savedProjects = await Promise.all(
@@ -756,6 +721,8 @@ router.get('/projects/recommend/:userId', verifyToken, async (req, res) => {
 
 router.post('/practice/generate-task', verifyToken, async (req, res) => {
     try {
+        const ai = getAi();
+        if (!ai) return res.status(503).json({ error: "AI API key not configured on server" });
         const { skill, targetJob } = req.body;
 
         const prompt = `You are a Technical Assessment Generator.
@@ -774,7 +741,13 @@ router.post('/practice/generate-task', verifyToken, async (req, res) => {
             "difficulty": "Medium"
         }`;
 
-        const data = parseJSONResponse(await callAI(prompt, true));
+        const response = await ai.chat.completions.create({
+            model: getModel(),
+            messages: [{ role: "system", content: prompt }],
+            response_format: { type: "json_object" }
+        });
+
+        const data = parseJSONResponse(response.choices[0].message.content);
 
         const newTask = await PracticeTask.create({
             userId: req.userId,
