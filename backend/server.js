@@ -22,18 +22,29 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import duelSocket from './sockets/duelSocket.js';
 
+const allowedOrigins = [
+    'https://temphackathon.vercel.app',
+    'https://algoprep-liard.vercel.app'
+];
+
+const corsOptions = {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+};
+
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: '*',
-        methods: ['GET', 'POST']
+        origin: allowedOrigins,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
     }
 });
 
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {
