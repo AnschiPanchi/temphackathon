@@ -2,8 +2,6 @@ import express from 'express';
 import User from '../models/User.js';
 import verifyToken from '../middleware/auth.js';
 import multer from 'multer';
-import fs from 'fs';
-import { PDFParse } from 'pdf-parse';
 
 const router = express.Router();
 
@@ -15,6 +13,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 router.post('/parse-resume', verifyToken, upload.single('resume'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     try {
+        const { PDFParse } = await import('pdf-parse');
         const parser = new PDFParse({ data: req.file.buffer });
         const parsed = await parser.getText();
         const text = parsed.text.toLowerCase();
