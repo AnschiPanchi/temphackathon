@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 dotenv.config();
 
-import connectDB from './db.js';
+import connectDB from './config/db.js';
 import authRoutes from './routes/auth.js';
 import aiRoutes from './routes/ai.js';
 import performanceRoutes from './routes/performance.js';
