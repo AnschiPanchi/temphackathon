@@ -25,11 +25,26 @@ import duelSocket from './sockets/duelSocket.js';
 const app = express();
 const server = createServer(app);
 
-const allowedOrigins = [
-    'https://temphackathon.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:3000'
-];
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim()).filter(Boolean)
+    : [
+        'https://temphackathon.vercel.app',
+        'https://algoprepp.vercel.app',
+        'http://localhost:5173',
+        'http://localhost:3000'
+    ];
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        // Allow non-browser clients (no origin) and explicitly whitelisted browser origins.
+        if (!origin || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error(`Origin not allowed by CORS: ${origin}`));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+};
 
 const io = new Server(server, {
     cors: {
@@ -41,9 +56,9 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 5000;
 
 app.use(cors({
-    origin: allowedOrigins,
-    credentials: true
+    ...corsOptions
 }));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {
