@@ -7,6 +7,8 @@ const router = express.Router();
 // POST /api/performance/save
 router.post('/save', verifyToken, async (req, res) => {
     const { topic, difficulty, questionTitle, code, timeSpent, score, feedbackSummary, strengths, areasForImprovement } = req.body;
+    const safeTimeSpent = Number.isFinite(Number(timeSpent)) ? Number(timeSpent) : 0;
+    const safeScore = Number.isFinite(Number(score)) ? Number(score) : 0;
 
     try {
         const attempt = new Attempt({
@@ -15,8 +17,8 @@ router.post('/save', verifyToken, async (req, res) => {
             difficulty,
             question: questionTitle,
             code,
-            timeSpent,
-            score,
+            timeSpent: safeTimeSpent,
+            score: safeScore,
             feedbackSummary,
             strengths: strengths || [],
             areasForImprovement: areasForImprovement || []

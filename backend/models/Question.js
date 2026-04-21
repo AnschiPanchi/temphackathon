@@ -7,6 +7,7 @@ const questionSchema = new mongoose.Schema({
     explanation: { type: String },
     difficulty_level: { type: Number, required: true, min: 1, max: 10 },
     topic: { type: String, required: true },
+    generatedByAI: { type: Boolean, default: false },
     
     // Creator Economy (Community Quests)
     creatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

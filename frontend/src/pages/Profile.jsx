@@ -120,18 +120,24 @@ const Profile = () => {
         fetchData();
     }, []);
 
+    const toNum = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+
     const totalAttempts = attempts.length;
-    const avgScore = totalAttempts > 0 ? Math.round(attempts.reduce((a, b) => a + b.score, 0) / totalAttempts) : 0;
-    const bestScore = totalAttempts > 0 ? Math.max(...attempts.map(a => a.score)) : 0;
-    const totalTime = attempts.reduce((a, b) => a + b.timeSpent, 0);
-    const passRate = totalAttempts > 0 ? Math.round((attempts.filter(a => a.score >= 70).length / totalAttempts) * 100) : 0;
+    const avgScore = totalAttempts > 0
+        ? Math.round(attempts.reduce((a, b) => a + toNum(b.score), 0) / totalAttempts)
+        : 0;
+    const bestScore = totalAttempts > 0 ? Math.max(...attempts.map(a => toNum(a.score))) : 0;
+    const totalTime = attempts.reduce((a, b) => a + toNum(b.timeSpent), 0);
+    const passRate = totalAttempts > 0
+        ? Math.round((attempts.filter(a => toNum(a.score) >= 70).length / totalAttempts) * 100)
+        : 0;
 
     // Topic breakdown
     const topicMap = {};
     attempts.forEach(a => {
         if (!a.topic) return;
         if (!topicMap[a.topic]) topicMap[a.topic] = { total: 0, count: 0 };
-        topicMap[a.topic].total += a.score;
+        topicMap[a.topic].total += toNum(a.score);
         topicMap[a.topic].count++;
     });
     const topicBreakdown = Object.entries(topicMap)
@@ -143,7 +149,12 @@ const Profile = () => {
     const earnedBadges = badges.filter(b => b.earned);
     const unearnedBadges = badges.filter(b => !b.earned);
 
-    const fmtTime = (s) => { const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
+    const fmtTime = (s) => {
+        const safeSeconds = toNum(s);
+        const h = Math.floor(safeSeconds / 3600);
+        const m = Math.floor((safeSeconds % 3600) / 60);
+        return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    };
 
     return (
         <div className="slide-up" style={{ maxWidth: '860px', margin: '0 auto' }}>
@@ -247,7 +258,7 @@ const Profile = () => {
                     </h3>
                     {['Easy', 'Medium', 'Hard'].map(diff => {
                         const items = attempts.filter(a => a.difficulty === diff);
-                        const avg = items.length > 0 ? Math.round(items.reduce((a, b) => a + b.score, 0) / items.length) : null;
+                        const avg = items.length > 0 ? Math.round(items.reduce((a, b) => a + toNum(b.score), 0) / items.length) : null;
                         const color = diff === 'Easy' ? 'var(--success)' : diff === 'Medium' ? 'var(--warning)' : 'var(--danger)';
                         return (
                             <div key={diff} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', marginBottom: '0.5rem', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-md)' }}>

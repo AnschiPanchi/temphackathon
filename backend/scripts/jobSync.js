@@ -9,7 +9,7 @@ export const fetchAndMatchJobs = async (specificUserId = null) => {
     
     try {
         // 1. Fetch Users who have a target job
-        const query = { targetJob: { $exists: true } };
+        const query = { targetJob: { $exists: true, $ne: '' } };
         if (specificUserId) query._id = specificUserId;
 
         const users = await User.find(query);

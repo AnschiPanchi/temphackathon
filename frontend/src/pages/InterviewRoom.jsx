@@ -15,7 +15,9 @@ const InterviewRoom = () => {
     const { addXP } = useContext(AuthContext);
 
     const savedSession = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
-    const { question, setup } = location.state || savedSession || {};
+    const isFreshSession = Boolean(location.state?.question);
+    const activeSession = isFreshSession ? location.state : (savedSession || {});
+    const { question, setup } = activeSession;
 
     useEffect(() => {
         if (location.state?.question) {
@@ -23,10 +25,18 @@ const InterviewRoom = () => {
         }
     }, [location.state]);
 
-    const [language, setLanguage] = useState(savedSession?.language || 'javascript');
-    const [code, setCode] = useState(savedSession?.code || question?.starterCode?.javascript || '// Write your solution here...\n');
-    const [approach, setApproach] = useState(savedSession?.approach || '');
-    const [timeLeft, setTimeLeft] = useState(savedSession?.timeLeft ?? ((setup?.duration || 30) * 60));
+    const [language, setLanguage] = useState(isFreshSession ? 'javascript' : (savedSession?.language || 'javascript'));
+    const [code, setCode] = useState(
+        isFreshSession
+            ? (question?.starterCode?.javascript || '// Write your solution here...\n')
+            : (savedSession?.code || question?.starterCode?.javascript || '// Write your solution here...\n')
+    );
+    const [approach, setApproach] = useState(isFreshSession ? '' : (savedSession?.approach || ''));
+    const [timeLeft, setTimeLeft] = useState(
+        isFreshSession
+            ? ((setup?.duration || 30) * 60)
+            : (savedSession?.timeLeft ?? ((setup?.duration || 30) * 60))
+    );
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isRunning, setIsRunning] = useState(false);
     const [testResults, setTestResults] = useState(null);

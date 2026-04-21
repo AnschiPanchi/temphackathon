@@ -52,6 +52,131 @@ const buildMentorProFallback = (user, missingSkills = []) => ({
     nextSkills: missingSkills.length > 0 ? missingSkills.slice(0, 5) : ['System Design', 'APIs', 'Testing']
 });
 
+const toReadableText = (item) => {
+    if (item == null) return '';
+    if (typeof item === 'string') return item.trim();
+    if (typeof item === 'number' || typeof item === 'boolean') return String(item);
+
+    if (typeof item === 'object') {
+        const get = (key) => (item[key] == null ? '' : String(item[key]).trim());
+
+        const title = get('title') || get('step') || get('phase') || get('month') || get('timeline') || get('period') || get('name');
+        const details = get('description') || get('details') || get('focus') || get('goal') || get('tasks') || get('action') || get('content') || get('advice') || get('reason') || get('text');
+
+        if (title && details) return `${title}: ${details}`;
+        if (details) return details;
+
+        const parts = Object.entries(item)
+            .map(([, val]) => (val == null ? '' : String(val).trim()))
+            .filter(Boolean);
+
+        if (parts.length > 1) return parts.slice(0, 3).join(' - ');
+        if (parts.length === 1) return parts[0];
+    }
+
+    return '';
+};
+
+const ensureStringArray = (value, fallback = []) => {
+    if (!Array.isArray(value)) return fallback;
+    const cleaned = value.map(toReadableText).filter(Boolean);
+    return cleaned.length > 0 ? cleaned : fallback;
+};
+
+const normalizeMentorData = (raw, fallback) => ({
+    careerAdvice: String(raw?.careerAdvice || fallback.careerAdvice || '').trim(),
+    nextSkills: ensureStringArray(raw?.nextSkills, fallback.nextSkills),
+    projectIdeas: ensureStringArray(raw?.projectIdeas, fallback.projectIdeas),
+    portfolioTips: ensureStringArray(raw?.portfolioTips, fallback.portfolioTips),
+    linkedinPostIdeas: ensureStringArray(raw?.linkedinPostIdeas, fallback.linkedinPostIdeas)
+});
+
+const normalizeMentorProData = (raw, fallback) => ({
+    careerAdvice: String(raw?.careerAdvice || fallback.careerAdvice || '').trim(),
+    nextSkills: ensureStringArray(raw?.nextSkills, fallback.nextSkills),
+    roadmap: ensureStringArray(raw?.roadmap, fallback.roadmap),
+    projectRecommendations: ensureStringArray(raw?.projectRecommendations, fallback.projectRecommendations),
+    linkedinSuggestions: ensureStringArray(raw?.linkedinSuggestions, fallback.linkedinSuggestions)
+});
+
+const buildStudyGuideFallback = (topic = 'Problem Solving') => ({
+    topic,
+    cheatSheet: [
+        {
+            concept: `${topic} Core Idea`,
+            explanation: `Understand the primary pattern in ${topic} and when to apply it under interview time limits.`
+        },
+        {
+            concept: 'Trade-offs',
+            explanation: 'Explain complexity and alternatives clearly (time, space, readability).' 
+        },
+        {
+            concept: 'Common Pitfalls',
+            explanation: 'Watch edge cases, null/empty input handling, and off-by-one mistakes.'
+        }
+    ],
+    interviewQuestions: [
+        {
+            question: `What is the main intuition behind ${topic}?`,
+            answer: `Start by defining the pattern, then describe one concrete example and complexity.`
+        },
+        {
+            question: `How would you optimize a naive ${topic} solution?`,
+            answer: 'Identify bottlenecks first, then use the right data structure or precomputation technique.'
+        }
+    ],
+    microChallenge: {
+        snippet: `function solve(input) {\n  // TODO: apply ${topic} pattern\n  return input;\n}`,
+        solution: 'Describe a corrected approach and validate it on edge cases before coding.'
+    }
+});
+
+const normalizeStudyGuideData = (raw, topic) => {
+    const fallback = buildStudyGuideFallback(topic);
+
+    const normalizeCheatSheetItem = (item) => {
+        if (typeof item === 'string') {
+            return { concept: topic, explanation: item.trim() };
+        }
+        const concept = String(item?.concept || item?.title || item?.name || topic).trim();
+        const explanation = String(item?.explanation || item?.details || item?.description || item?.text || '').trim();
+        if (!explanation) return null;
+        return { concept, explanation };
+    };
+
+    const normalizeInterviewQuestion = (item) => {
+        if (typeof item === 'string') {
+            return { question: `Explain this ${topic} concept`, answer: item.trim() };
+        }
+        const question = String(item?.question || item?.q || item?.prompt || `What should you know about ${topic}?`).trim();
+        const answer = String(item?.answer || item?.a || item?.explanation || item?.details || '').trim();
+        if (!answer) return null;
+        return { question, answer };
+    };
+
+    const cheatSheet = Array.isArray(raw?.cheatSheet)
+        ? raw.cheatSheet.map(normalizeCheatSheetItem).filter(Boolean)
+        : [];
+
+    const interviewQuestions = Array.isArray(raw?.interviewQuestions)
+        ? raw.interviewQuestions.map(normalizeInterviewQuestion).filter(Boolean)
+        : [];
+
+    const micro = raw?.microChallenge || {};
+    const snippet = String(micro?.snippet || micro?.code || '').trim();
+    const solution = String(micro?.solution || micro?.answer || micro?.fix || '').trim();
+
+    return {
+        topic: String(raw?.topic || topic || fallback.topic).trim(),
+        cheatSheet: cheatSheet.length > 0 ? cheatSheet : fallback.cheatSheet,
+        interviewQuestions: interviewQuestions.length > 0 ? interviewQuestions : fallback.interviewQuestions,
+        microChallenge: {
+            snippet: snippet || fallback.microChallenge.snippet,
+            solution: solution || fallback.microChallenge.solution
+        }
+    };
+};
+
 // --- Controller Methods ---
 
 export const generateQuestion = async (req, res) => {
@@ -59,16 +184,11 @@ export const generateQuestion = async (req, res) => {
         const ai = getAiClient();
         if (!ai) return res.status(503).json({ error: "AI API key not configured on server." });
         
-        const { mode, topics = [], difficulty, solvedQuestions = [] } = req.body;
+        const { topics = [], difficulty, solvedQuestions = [] } = req.body;
         const user = await User.findById(req.userId);
         if (!user) return res.status(404).json({ error: "User not found" });
-        
-        let targetTopics = topics;
-        if (mode === 'ai-recommended') {
-            const jobMatches = await JobMatch.find({ userId: req.userId }).select('missingSkills');
-            const missingSkills = [...new Set(jobMatches.flatMap(m => m.missingSkills || []))];
-            targetTopics = missingSkills.length > 0 ? missingSkills : ['General Problem Solving'];
-        }
+
+        const targetTopics = topics.length > 0 ? topics : ['General Problem Solving'];
 
         const avoidanceRule = solvedQuestions.length > 0
             ? `\nCRITICAL: DO NOT GENERATE ANY OF THE FOLLOWING QUESTIONS THAT THE CANDIDATE HAS ALREADY SOLVED:\n${solvedQuestions.map(q => `- ${q}`).join('\n')}\n`
@@ -289,15 +409,30 @@ export const generateStudyGuide = async (req, res) => {
     try {
         const ai = getAiClient();
         const { topic } = req.body;
-        const prompt = `Create study guide for ${topic}. Include cheatSheet, interviewQuestions, and microChallenge. Respond in JSON.`;
+        const safeTopic = String(topic || 'Problem Solving').trim();
+        const prompt = `Create a concise interview study guide for ${safeTopic}.
+Return strict JSON with this schema:
+{
+  "topic": "${safeTopic}",
+  "cheatSheet": [{ "concept": "...", "explanation": "..." }],
+  "interviewQuestions": [{ "question": "...", "answer": "..." }],
+  "microChallenge": { "snippet": "...", "solution": "..." }
+}`;
+
+        if (!ai) {
+            return res.json(buildStudyGuideFallback(safeTopic));
+        }
+
         const response = await ai.chat.completions.create({
             model: getAiModel(),
             messages: [{ role: "system", content: prompt }],
             response_format: { type: "json_object" }
         });
-        res.json(parseJSONResponse(response.choices[0].message.content));
+        const parsed = parseJSONResponse(response.choices[0].message.content);
+        res.json(normalizeStudyGuideData(parsed, safeTopic));
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        const safeTopic = String(req.body?.topic || 'Problem Solving').trim();
+        res.json(buildStudyGuideFallback(safeTopic));
     }
 };
 
@@ -308,18 +443,28 @@ export const getMentorAdvice = async (req, res) => {
         if (!user) return res.status(404).json({ error: "User not found" });
         const jobMatches = await JobMatch.find({ userId: req.params.userId }).select('missingSkills jobTitle company');
         const missingSkills = [...new Set(jobMatches.flatMap(m => m.missingSkills || []))];
+        const fallback = buildMentorFallback(user, missingSkills);
         
-        if (!ai) return res.json(buildMentorFallback(user, missingSkills));
+        if (!ai) return res.json(fallback);
 
-        const prompt = `Generate premium career guidance for ${user.username} targeting ${user.targetJob}. Skills: ${user.skills?.join(', ')}. Missing: ${missingSkills.join(', ')}. Respond in JSON.`;
+        const prompt = `Generate premium career guidance for ${user.username} targeting ${user.targetJob}. Skills: ${user.skills?.join(', ')}. Missing: ${missingSkills.join(', ')}.
+Respond strictly as JSON with keys: careerAdvice (string), nextSkills (array), projectIdeas (array), portfolioTips (array), linkedinPostIdeas (array).`;
         const response = await ai.chat.completions.create({
             model: getAiModel(),
             messages: [{ role: "system", content: prompt }],
             response_format: { type: "json_object" }
         });
-        res.json(parseJSONResponse(response.choices[0].message.content));
+        const parsed = parseJSONResponse(response.choices[0].message.content);
+        res.json(normalizeMentorData(parsed, fallback));
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        try {
+            const user = await User.findById(req.params.userId);
+            const jobMatches = await JobMatch.find({ userId: req.params.userId }).select('missingSkills');
+            const missingSkills = [...new Set(jobMatches.flatMap(m => m.missingSkills || []))];
+            return res.json(buildMentorFallback(user, missingSkills));
+        } catch {
+            return res.status(500).json({ error: error.message });
+        }
     }
 };
 
@@ -330,18 +475,28 @@ export const getMentorProAdvice = async (req, res) => {
         if (!user) return res.status(404).json({ error: "User not found" });
         const jobMatches = await JobMatch.find({ userId: req.params.userId }).select('missingSkills jobTitle');
         const missingSkills = [...new Set(jobMatches.flatMap(m => m.missingSkills || []))];
+        const fallback = buildMentorProFallback(user, missingSkills);
 
-        if (!ai) return res.json(buildMentorProFallback(user, missingSkills));
+        if (!ai) return res.json(fallback);
 
-        const prompt = `Generate elite Career Mentor PRO plan for ${user.username}. Target: ${user.targetJob}. Missing: ${missingSkills.join(', ')}. Respond in JSON.`;
+        const prompt = `Generate elite Career Mentor PRO plan for ${user.username}. Target: ${user.targetJob}. Missing: ${missingSkills.join(', ')}.
+Respond strictly as JSON with keys: careerAdvice (string), nextSkills (array), roadmap (array), projectRecommendations (array), linkedinSuggestions (array).`;
         const response = await ai.chat.completions.create({
             model: getAiModel(),
             messages: [{ role: "system", content: prompt }],
             response_format: { type: "json_object" }
         });
-        res.json(parseJSONResponse(response.choices[0].message.content));
+        const parsed = parseJSONResponse(response.choices[0].message.content);
+        res.json(normalizeMentorProData(parsed, fallback));
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        try {
+            const user = await User.findById(req.params.userId);
+            const jobMatches = await JobMatch.find({ userId: req.params.userId }).select('missingSkills');
+            const missingSkills = [...new Set(jobMatches.flatMap(m => m.missingSkills || []))];
+            return res.json(buildMentorProFallback(user, missingSkills));
+        } catch {
+            return res.status(500).json({ error: error.message });
+        }
     }
 };
 

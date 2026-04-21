@@ -2,12 +2,58 @@ import express from 'express';
 import verifyToken from '../middleware/auth.js';
 import User from '../models/User.js';
 import Question from '../models/Question.js';
+import JobMatch from '../models/JobMatch.js';
 import Quest from '../models/Quest.js';
 import QuestCompletion from '../models/QuestCompletion.js';
 import { calculateLevel } from '../utils/leveling.js';
 import { checkAchievements } from '../utils/achievementEngine.js';
+import { getAiClient, getAiModel, parseJSONResponse } from '../services/aiService.js';
 
 const router = express.Router();
+
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+const buildFallbackQuestion = (topic, difficulty) => {
+    const safeTopic = topic || 'Problem Solving';
+    const a = Math.floor(Math.random() * 30) + 5;
+    const b = Math.floor(Math.random() * 20) + 2;
+    const correct = a + b;
+    const distractors = [correct - 1, correct + 1, correct + 2].map(String);
+    const options = [String(correct), ...distractors].sort(() => Math.random() - 0.5);
+    return {
+        text: `[${safeTopic}] What is ${a} + ${b}?`,
+        options,
+        correctOption: options.indexOf(String(correct)),
+        explanation: `Adding ${a} and ${b} gives ${correct}.`,
+        topic: safeTopic,
+        difficulty_level: clamp(Number(difficulty) || 5, 1, 10)
+    };
+};
+
+const normalizeGeneratedQuestion = (raw, fallbackTopic, fallbackDifficulty) => {
+    const fallback = buildFallbackQuestion(fallbackTopic, fallbackDifficulty);
+    const options = Array.isArray(raw?.options)
+        ? raw.options.map(opt => String(opt).trim()).filter(Boolean)
+        : [];
+
+    const normalizedOptions = options.length >= 4 ? options.slice(0, 4) : fallback.options;
+    const normalizedCorrect = Number.isInteger(raw?.correctOption) && raw.correctOption >= 0 && raw.correctOption < normalizedOptions.length
+        ? raw.correctOption
+        : 0;
+
+    return {
+        text: String(raw?.text || fallback.text).trim(),
+        options: normalizedOptions,
+        correctOption: normalizedCorrect,
+        explanation: String(raw?.explanation || fallback.explanation).trim(),
+        topic: String(raw?.topic || fallback.topic).trim(),
+        difficulty_level: clamp(Number(raw?.difficulty_level || fallback.difficulty_level), 1, 10),
+        generatedByAI: true,
+        status: 'approved'
+    };
+};
 
 // Seed initial questions if needed (temp route)
 router.post('/seed', async (req, res) => {
@@ -35,6 +81,7 @@ router.get('/next', verifyToken, async (req, res) => {
     try {
         const { questionId } = req.query;
         const user = await User.findById(req.userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
 
         if (questionId) {
             const specificQ = await Question.findById(questionId);
@@ -44,27 +91,72 @@ router.get('/next', verifyToken, async (req, res) => {
 
         const now = new Date();
         // 1. Check Spaced Repetition (Failed / Due questions)
-        const dueHistory = user.quizHistory.filter(q => q.nextTest && q.nextTest <= now);
+        const dueHistory = user.quizHistory.filter(q => q.nextTest && q.nextTest <= now && q.questionId);
         if (dueHistory.length > 0) {
-            const dueQuestion = await Question.findById(dueHistory[0].questionId);
+            const randomDue = dueHistory[Math.floor(Math.random() * dueHistory.length)];
+            const dueQuestion = await Question.findOne({ _id: randomDue.questionId, status: 'approved', generatedByAI: true });
             if (dueQuestion) return res.json(dueQuestion);
         }
 
-        // 2. Fetch new question matching user's ability score
-        const answeredIds = user.quizHistory.map(h => h.questionId);
-        let nextQ = await Question.findOne({
-            _id: { $nin: answeredIds },
-            difficulty_level: { $lte: user.abilityScore + 1 }, // slightly above or equal
-            status: 'approved'
-        }).sort({ difficulty_level: -1 });
+        // 2. Generate a fresh AI question based on skills and missing/weak areas
+        const ai = getAiClient();
+        if (!ai) return res.status(503).json({ error: 'AI API key not configured on server.' });
 
-        // Fallback if no questions found at that level
-        if (!nextQ) {
-            nextQ = await Question.findOne({ _id: { $nin: answeredIds }, status: 'approved' });
+        const jobMatches = await JobMatch.find({ userId: req.userId }).select('missingSkills');
+        const missingSkills = [...new Set(jobMatches.flatMap(m => m.missingSkills || []))];
+        const weakTopics = (user.weakTopics || []).filter(Boolean);
+        const userSkills = (user.skills || []).filter(Boolean);
+
+        const priorityTopics = [...new Set([...weakTopics, ...missingSkills])];
+        const supportTopics = [...new Set(userSkills)];
+        const topicPool = priorityTopics.length > 0 ? priorityTopics : (supportTopics.length > 0 ? supportTopics : ['Problem Solving']);
+        const chosenTopic = pickRandom(topicPool);
+        const targetDifficulty = clamp(user.abilityScore + (Math.random() > 0.5 ? 1 : 0), 1, 10);
+
+        const prompt = `You are generating ONE multiple-choice technical quiz question for interview prep.
+
+User profile:
+- Stronger skills: ${supportTopics.join(', ') || 'Not specified'}
+- Missing/weak skills (priority): ${priorityTopics.join(', ') || 'Not specified'}
+- Focus topic for this question: ${chosenTopic}
+- Target difficulty level (1-10): ${targetDifficulty}
+
+Rules:
+1. The question MUST be directly related to the focus topic.
+2. Keep it practical and interview-relevant.
+3. Provide exactly 4 options.
+4. Exactly one option must be correct.
+5. Return valid JSON only (no markdown).
+
+Return schema:
+{
+  "text": "Question text",
+  "options": ["A", "B", "C", "D"],
+  "correctOption": 0,
+  "explanation": "Brief explanation",
+  "topic": "${chosenTopic}",
+  "difficulty_level": ${targetDifficulty}
+}`;
+
+        let aiData;
+        try {
+            const response = await ai.chat.completions.create({
+                model: getAiModel(),
+                messages: [{ role: 'system', content: prompt }],
+                response_format: { type: 'json_object' }
+            });
+            aiData = parseJSONResponse(response.choices[0].message.content);
+        } catch (jsonError) {
+            const response = await ai.chat.completions.create({
+                model: getAiModel(),
+                messages: [{ role: 'system', content: prompt }]
+            });
+            aiData = parseJSONResponse(response.choices[0].message.content);
         }
 
-        if (!nextQ) return res.status(404).json({ error: 'No more questions available!' });
-        res.json(nextQ);
+        const generatedQuestion = normalizeGeneratedQuestion(aiData, chosenTopic, targetDifficulty);
+        const savedQuestion = await Question.create(generatedQuestion);
+        res.json(savedQuestion);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to get next question' });

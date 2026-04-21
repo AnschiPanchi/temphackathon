@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { io } from 'socket.io-client';
+import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import {
     Swords, Timer, Trophy, Send, Users, Zap, Crown, Copy,
@@ -32,13 +32,11 @@ const DuelRoom = () => {
     const [duelResult, setDuelResult] = useState(null);
     const [opponentSubmitted, setOpponentSubmitted] = useState(false);
     const [language, setLanguage] = useState('javascript');
-    const [socketReady, setSocketReady] = useState(false);
     const [error, setError] = useState('');
     const [disconnectedPlayer, setDisconnectedPlayer] = useState(null);
 
     const timerRef = useRef(null);
-    const socketRef = useRef(null);
-    const pendingJoin = useRef(null); // stores join data until socket is ready
+    const pollRef = useRef(null);
 
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const [activeTab, setActiveTab] = useState('problem');
@@ -49,70 +47,59 @@ const DuelRoom = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // ── Socket setup ─────────────────────────────────────────────
-    useEffect(() => {
-        if (!token) return;
+    const authHeaders = () => ({ headers: { Authorization: `Bearer ${token}` } });
 
-        const s = io(API_URL, { auth: { token } });
-        socketRef.current = s;
+    const applyRoomState = (room) => {
+        setPlayers(room.players || []);
+        if (room.language) setLanguage(room.language);
+        if (room.problem) setProblem(room.problem);
 
-        s.on('connect', () => {
-            console.log('[DUEL] Socket connected:', s.id);
-            setSocketReady(true);
-            // If there was a pending join (e.g. user clicked Join before socket connected), emit now
-            if (pendingJoin.current) {
-                s.emit('join_room', pendingJoin.current);
-                pendingJoin.current = null;
-            }
-        });
+        const submittedBy = new Set((room.submissions || []).map(s => s.username));
+        setIsSubmitted(submittedBy.has(user?.username));
+        setOpponentSubmitted((room.players || []).some(p => p.username !== user?.username && submittedBy.has(p.username)));
 
-        s.on('room_update', (room) => {
-            console.log('[DUEL] room_update:', room);
-            setPlayers(room.players || []);
-            if (room.language) setLanguage(room.language);
-            if (room.problem) setProblem(room.problem);
-
-            if ((room.players || []).length === 2) {
-                setPhase('duel');
-            }
-        });
-
-        s.on('player_submitted', ({ username }) => {
-            if (username !== user?.username) {
-                setOpponentSubmitted(true);
-            }
-        });
-
-        s.on('player_disconnected', ({ username }) => {
-            setDisconnectedPlayer(username);
-            setPhase('waiting'); // drop back to waiting if opponent leaves mid-duel
-        });
-
-        s.on('room_full', () => {
-            setError('This room is already full. Please try a different room code.');
-            setPhase('lobby');
-        });
-
-        s.on('duel_finished', (result) => {
-            setDuelResult(result);
+        if (room.status === 'finished' && room.result) {
+            setDuelResult(room.result);
             setPhase('result');
             clearInterval(timerRef.current);
-        });
+            return;
+        }
 
-        s.on('duel_error', ({ message }) => {
-            setError(message);
-        });
+        if (room.status === 'judging') {
+            setPhase('judging');
+            return;
+        }
 
-        s.on('disconnect', () => {
-            console.log('[DUEL] Socket disconnected');
-            setSocketReady(false);
-        });
+        if ((room.players || []).length === 2) {
+            setPhase('duel');
+        } else {
+            setPhase('waiting');
+        }
+    };
 
-        return () => {
-            s.disconnect();
-            clearInterval(timerRef.current);
-        };
-    }, [token]);
+    const fetchRoomState = async (id) => {
+        if (!id || !token) return;
+        try {
+            const res = await axios.get(`${API_URL}/api/duel/state/${id}`, authHeaders());
+            applyRoomState(res.data);
+        } catch (err) {
+            if (err.response?.status === 404) return;
+            setError(err.response?.data?.error || 'Failed to sync duel room.');
+        }
+    };
+
+    useEffect(() => {
+        clearInterval(pollRef.current);
+
+        if (!roomId || !token || !['waiting', 'duel', 'judging'].includes(phase)) {
+            return;
+        }
+
+        fetchRoomState(roomId);
+        pollRef.current = setInterval(() => fetchRoomState(roomId), 2000);
+
+        return () => clearInterval(pollRef.current);
+    }, [roomId, token, phase]);
 
     // ── Timer ─────────────────────────────────────────────────────
     useEffect(() => {
@@ -129,41 +116,58 @@ const DuelRoom = () => {
     }, [duelResult]);
 
     // ── Actions ───────────────────────────────────────────────────
-    const doJoin = (id) => {
-        const payload = { roomId: id, username: user?.username };
-        if (socketRef.current?.connected) {
-            socketRef.current.emit('join_room', payload);
-        } else {
-            // Socket not connected yet — queue it
-            pendingJoin.current = payload;
+    const doJoin = async (id) => {
+        try {
+            setError('');
+            const res = await axios.post(`${API_URL}/api/duel/join`, { roomId: id }, authHeaders());
+            applyRoomState(res.data);
+        } catch (err) {
+            if (err.response?.status === 409) {
+                setError('This room is already full. Please try a different room code.');
+            } else {
+                setError(err.response?.data?.error || 'Failed to join duel room.');
+            }
+            setPhase('lobby');
         }
-        setPhase('waiting');
     };
 
-    const handleCreate = () => {
+    const handleCreate = async () => {
         const id = Math.random().toString(36).substring(2, 8).toUpperCase();
         setRoomId(id);
         setDisconnectedPlayer(null);
-        doJoin(id);
+        await doJoin(id);
     };
 
-    const handleJoin = () => {
+    const handleJoin = async () => {
         if (!roomId.trim()) return;
         setDisconnectedPlayer(null);
-        doJoin(roomId.trim().toUpperCase());
+        await doJoin(roomId.trim().toUpperCase());
     };
 
-    const handleSubmit = () => {
-        if (!socketRef.current || isSubmitted) return;
+    const handleSubmit = async () => {
+        if (isSubmitted || !roomId) return;
         setIsSubmitted(true);
-        socketRef.current.emit('submit_code', { roomId, username: user?.username, code, language });
-        if (opponentSubmitted) setPhase('judging');
+        try {
+            const res = await axios.post(`${API_URL}/api/duel/submit`, {
+                roomId,
+                code,
+                language
+            }, authHeaders());
+            applyRoomState(res.data);
+        } catch (err) {
+            setError(err.response?.data?.error || 'Submission failed. Please try again.');
+            setIsSubmitted(false);
+        }
     };
 
-    const handleLanguageChange = (newLang) => {
+    const handleLanguageChange = async (newLang) => {
         setLanguage(newLang);
-        if (socketRef.current) {
-            socketRef.current.emit('change_language', { roomId, language: newLang });
+        if (roomId) {
+            try {
+                await axios.post(`${API_URL}/api/duel/language`, { roomId, language: newLang }, authHeaders());
+            } catch {
+                // Keep local selection even if API sync temporarily fails.
+            }
         }
     };
 

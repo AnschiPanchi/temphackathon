@@ -15,6 +15,44 @@ const TopicStudy = () => {
     const [activeTab, setActiveTab] = useState('theory');
     const [showSolution, setShowSolution] = useState(false);
 
+    const normalizeGuide = (raw, fallbackTopic) => {
+        if (!raw) return null;
+
+        const toText = (v) => (v == null ? '' : String(v).trim());
+
+        const cheatSheet = Array.isArray(raw.cheatSheet)
+            ? raw.cheatSheet.map(item => {
+                if (typeof item === 'string') return { concept: fallbackTopic, explanation: item };
+                return {
+                    concept: toText(item?.concept || item?.title || item?.name || fallbackTopic),
+                    explanation: toText(item?.explanation || item?.details || item?.description || item?.text)
+                };
+            }).filter(item => item.explanation)
+            : [];
+
+        const interviewQuestions = Array.isArray(raw.interviewQuestions)
+            ? raw.interviewQuestions.map(item => {
+                if (typeof item === 'string') return { question: `Interview question on ${fallbackTopic}`, answer: item };
+                return {
+                    question: toText(item?.question || item?.q || item?.prompt || `Interview question on ${fallbackTopic}`),
+                    answer: toText(item?.answer || item?.a || item?.explanation || item?.details)
+                };
+            }).filter(item => item.answer)
+            : [];
+
+        const microChallenge = {
+            snippet: toText(raw?.microChallenge?.snippet || raw?.microChallenge?.code) || `function solve(input) {\n  // apply ${fallbackTopic}\n  return input;\n}`,
+            solution: toText(raw?.microChallenge?.solution || raw?.microChallenge?.answer || raw?.microChallenge?.fix) || 'Explain your fix and verify with at least one edge case.'
+        };
+
+        return {
+            topic: toText(raw.topic || fallbackTopic) || fallbackTopic,
+            cheatSheet,
+            interviewQuestions,
+            microChallenge
+        };
+    };
+
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const t = params.get('topic');
@@ -33,7 +71,7 @@ const TopicStudy = () => {
             const res = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/ai/study-guide`, { topic: t }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setGuide(res.data);
+            setGuide(normalizeGuide(res.data, t));
         } catch (err) {
             console.error("Failed to fetch study guide:", err);
         } finally {
@@ -108,7 +146,7 @@ const TopicStudy = () => {
                     {activeTab === 'theory' && (
                         <div className="slide-up">
                             <div style={{ display: 'grid', gap: '2rem' }}>
-                                {guide.cheatSheet?.map((item, i) => (
+                                {guide.cheatSheet?.length > 0 ? guide.cheatSheet.map((item, i) => (
                                     <div key={i} style={{ display: 'flex', gap: '1.5rem' }}>
                                         <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800 }}>{i + 1}</div>
                                         <div>
@@ -116,14 +154,14 @@ const TopicStudy = () => {
                                             <p style={{ color: 'var(--text-sub)', lineHeight: 1.7, fontSize: '1rem' }}>{item.explanation}</p>
                                         </div>
                                     </div>
-                                ))}
+                                )) : <p className="text-muted">No theory content available yet. Try regenerating this module.</p>}
                             </div>
                         </div>
                     )}
 
                     {activeTab === 'concepts' && (
                         <div className="slide-up" style={{ display: 'grid', gap: '1.5rem' }}>
-                            {guide.interviewQuestions?.map((q, i) => (
+                            {guide.interviewQuestions?.length > 0 ? guide.interviewQuestions.map((q, i) => (
                                 <div key={i} className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.02)' }}>
                                     <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', color: 'var(--warning)', fontWeight: 700, fontSize: '0.9rem' }}>
                                         <HelpCircle size={18} /> Q{i + 1}: {q.question}
@@ -133,7 +171,7 @@ const TopicStudy = () => {
                                         {q.answer}
                                     </div>
                                 </div>
-                            ))}
+                            )) : <p className="text-muted">No interview Q&A available yet. Try regenerating this module.</p>}
                         </div>
                     )}
 

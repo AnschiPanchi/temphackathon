@@ -4,15 +4,27 @@ import express from 'express';
 import JobMatch from '../models/JobMatch.js';
 import Notification from '../models/Notification.js';
 import { fetchAndMatchJobs } from '../scripts/jobSync.js';
+import User from '../models/User.js';
 
 const router = express.Router();
 
 // GET /api/jobs/recommended/:userId
 router.get('/recommended/:userId', async (req, res) => {
     try {
-        const jobs = await JobMatch.find({ userId: req.params.userId })
-                                   .sort({ similarityScore: -1 })
-                                   .limit(20);
+        const user = await User.findById(req.params.userId).select('targetJob');
+        const targetField = String(req.query.targetField || user?.targetJob || '').trim().toLowerCase();
+
+        let jobs = await JobMatch.find({ userId: req.params.userId })
+            .sort({ similarityScore: -1, createdAt: -1 });
+
+        if (targetField) {
+            const targetTokens = targetField.split(/\s+/).filter(t => t.length > 2);
+            jobs = jobs.filter(job => {
+                const hay = `${job.jobTitle || ''} ${job.description || ''}`.toLowerCase();
+                return targetTokens.some(token => hay.includes(token));
+            });
+        }
+
         res.json(jobs);
     } catch (error) {
         res.status(500).json({ error: "Failed to fetch jobs" });

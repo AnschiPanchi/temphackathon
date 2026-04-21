@@ -8,15 +8,73 @@ const router = express.Router();
 // multer setup — memory storage so we can read the buffer
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+const extractTextFromPdf = async (buffer) => {
+    const errors = [];
+
+    // Strategy 1: pdf-parse v2 node submodule
+    try {
+        const nodeMod = await import('pdf-parse/node');
+        if (typeof nodeMod.PDFParse === 'function') {
+            const parser = new nodeMod.PDFParse({ data: buffer });
+            const parsed = await parser.getText();
+            if (typeof parser.destroy === 'function') await parser.destroy();
+            if (parsed?.text) return parsed.text;
+        }
+    } catch (err) {
+        errors.push(`node-submodule: ${err.message}`);
+    }
+
+    // Strategy 2: pdf-parse v2 main module
+    try {
+        const mod = await import('pdf-parse');
+        if (typeof mod.PDFParse === 'function') {
+            const parser = new mod.PDFParse({ data: buffer });
+            const parsed = await parser.getText();
+            if (typeof parser.destroy === 'function') await parser.destroy();
+            if (parsed?.text) return parsed.text;
+        }
+    } catch (err) {
+        errors.push(`main-module: ${err.message}`);
+    }
+
+    // Strategy 3: legacy function API compatibility
+    try {
+        const legacyMod = await import('pdf-parse');
+        const legacyFn = legacyMod.default;
+        if (typeof legacyFn === 'function') {
+            const parsed = await legacyFn(buffer);
+            if (parsed?.text) return parsed.text;
+        }
+    } catch (err) {
+        errors.push(`legacy-api: ${err.message}`);
+    }
+
+    throw new Error(`PDF extraction failed. ${errors.join(' | ')}`);
+};
+
+const parseResumeUpload = (req, res, next) => {
+    upload.single('resume')(req, res, (err) => {
+        if (!err) return next();
+
+        if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: 'Resume exceeds 10MB limit.' });
+        }
+
+        return res.status(400).json({ error: err.message || 'Invalid resume upload.' });
+    });
+};
+
 // POST /api/onboarding/parse-resume
 // Parse a PDF resume and return extracted skills (uses pdf-parse)
-router.post('/parse-resume', verifyToken, upload.single('resume'), async (req, res) => {
+router.post('/parse-resume', verifyToken, parseResumeUpload, async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    if (req.file.mimetype !== 'application/pdf') {
+        return res.status(400).json({ error: 'Only PDF files are supported.' });
+    }
+
     try {
-        const { PDFParse } = await import('pdf-parse');
-        const parser = new PDFParse({ data: req.file.buffer });
-        const parsed = await parser.getText();
-        const text = parsed.text.toLowerCase();
+        const extractedText = await extractTextFromPdf(req.file.buffer);
+        const text = String(extractedText || '').toLowerCase();
 
         // Comprehensive keyword-based skill extraction
         const SKILL_KEYWORDS = [
@@ -44,7 +102,10 @@ router.post('/parse-resume', verifyToken, upload.single('resume'), async (req, r
         res.json({ skills: [...new Set(found)] });
     } catch (err) {
         console.error('PDF parse error:', err);
-        res.status(500).json({ error: 'Failed to parse PDF' });
+        res.status(500).json({
+            error: 'Failed to parse PDF. Please try a text-based PDF (not scanned image).',
+            details: err.message
+        });
     }
 });
 

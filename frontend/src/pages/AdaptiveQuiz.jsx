@@ -20,12 +20,12 @@ const AdaptiveQuiz = () => {
     
     const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
-    const fetchNext = async () => {
+    const fetchNext = async ({ forceGeneral = false } = {}) => {
         setLoading(true);
         setResult(null);
         setSelectedOpt(null);
         try {
-            const url = targetQuestionId && !result 
+            const url = targetQuestionId && !forceGeneral && !result
                 ? `${API_URL}/api/quiz/next?questionId=${targetQuestionId}`
                 : `${API_URL}/api/quiz/next`;
 
@@ -178,7 +178,7 @@ const AdaptiveQuiz = () => {
                                 <button className="btn btn-primary" onClick={() => {
                                     if (targetQuestionId) {
                                         navigate('/quiz', { replace: true });
-                                        fetchNext();
+                                        fetchNext({ forceGeneral: true });
                                     } else {
                                         fetchNext();
                                     }

@@ -15,6 +15,7 @@ import quizRoutes from './routes/quiz.js';
 import achievementRoutes from './routes/achievements.js';
 import jobRoutes from './routes/jobRoutes.js';
 import questsRoutes from './routes/quests.js';
+import duelRoutes from './routes/duel.js';
 import cron from 'node-cron';
 import { fetchAndMatchJobs } from './scripts/jobSync.js';
 
@@ -97,6 +98,7 @@ app.use('/api/quiz', quizRoutes);
 app.use('/api/achievements', achievementRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/quests', questsRoutes);
+app.use('/api/duel', duelRoutes);
 
 if (!isVercel) {
     // Keep cron + sockets only for persistent server environments.
